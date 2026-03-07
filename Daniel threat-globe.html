@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THREATWATCH — Global Intelligence</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --bg: #020408;
+    --panel: rgba(0,255,180,0.04);
+    --border: rgba(0,255,180,0.15);
+    --green: #00ffb4;
+    --red: #ff2244;
+    --text: #c8fff0;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    cursor: crosshair;
+  }
+
+  body::after {
+    content:''; position:fixed; inset:0;
+    background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.07) 2px,rgba(0,0,0,0.07) 4px);
+    pointer-events:none; z-index:200;
+  }
+  body::before {
+    content:''; position:fixed; inset:0;
+    background: radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,0.65) 100%);
+    pointer-events:none; z-index:199;
+  }
+
+  canvas { display:block; position:fixed; inset:0; }
+  canvas:active { cursor:grabbing; }
+
+  .header {
+    position:fixed; top:0; left:0; right:0;
+    padding:14px 24px;
+    display:flex; align-items:center; justify-content:space-between;
+    border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg,rgba(0,10,8,0.97) 0%,transparent 100%);
+    z-index:100;
+  }
+  .logo {
+    font-family:'Orbitron',sans-serif; font-weight:900; font-size:1.2rem;
+    letter-spacing:0.3em; color:var(--green);
+    text-shadow:0 0 20px rgba(0,255,180,0.6);
+  }
+  .logo span { color:var(--red); text-shadow:0 0 20px rgba(255,34,68,0.8); }
+
+  .status-bar { display:flex; gap:24px; align-items:center; font-size:0.6rem; letter-spacing:0.12em; }
+  .s-item { display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
+  .s-label { opacity:0.4; font-size:0.5rem; letter-spacing:0.15em; }
+  .s-val { color:var(--green); }
+  .pulse-dot {
+    width:6px; height:6px; border-radius:50%;
+    background:var(--green); box-shadow:0 0 8px var(--green);
+    animation:pulseAnim 1.8s ease-in-out infinite;
+    display:inline-block; margin-right:5px;
+  }
+  @keyframes pulseAnim { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.7)} }
+
+  .legend {
+    position:fixed; bottom:34px; left:24px;
+    border:1px solid var(--border); background:var(--panel);
+    backdrop-filter:blur(12px); padding:14px 18px; z-index:100; min-width:165px;
+  }
+  .legend::before {
+    content:'THREAT INDEX'; display:block; font-size:0.5rem;
+    letter-spacing:0.2em; opacity:0.4; margin-bottom:10px;
+    padding-bottom:7px; border-bottom:1px solid var(--border);
+  }
+  .leg-item { display:flex; align-items:center; gap:9px; margin-bottom:7px; font-size:0.6rem; letter-spacing:0.08em; }
+  .leg-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+
+  .coords {
+    position:fixed; top:72px; right:24px;
+    font-size:0.58rem; letter-spacing:0.1em; opacity:0.4; z-index:100; text-align:right;
+  }
+
+  .ticker {
+    position:fixed; bottom:0; left:0; right:0; height:28px;
+    background:rgba(0,0,0,0.88); border-top:1px solid rgba(255,34,68,0.3);
+    display:flex; align-items:center; overflow:hidden; z-index:100;
+  }
+  .ticker-label {
+    background:var(--red); color:#000;
+    font-family:'Orbitron',sans-serif; font-size:0.48rem; font-weight:700;
+    letter-spacing:0.15em; padding:0 10px; height:100%;
+    display:flex; align-items:center; flex-shrink:0;
+  }
+  .ticker-content {
+    white-space:nowrap; animation:tickerScroll 60s linear infinite;
+    font-size:0.55rem; letter-spacing:0.06em; opacity:0.75; padding-left:20px;
+  }
+  @keyframes tickerScroll { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+
+  .corner { position:fixed; width:36px; height:36px; z-index:100; opacity:0.25; }
+  .corner-tl { top:0;left:0; border-top:2px solid var(--green); border-left:2px solid var(--green); }
+  .corner-tr { top:0;right:0; border-top:2px solid var(--green); border-right:2px solid var(--green); }
+  .corner-bl { bottom:0;left:0; border-bottom:2px solid var(--green); border-left:2px solid var(--green); }
+  .corner-br { bottom:0;right:0; border-bottom:2px solid var(--green); border-right:2px solid var(--green); }
+
+  /* tooltip */
+  .tooltip {
+    position:fixed; pointer-events:none; z-index:150;
+    background:rgba(2,8,6,0.95); border:1px solid var(--border);
+    padding:6px 11px; font-size:0.58rem; letter-spacing:0.09em;
+    white-space:nowrap; opacity:0; transition:opacity 0.12s;
+    backdrop-filter:blur(8px); max-width:280px;
+  }
+  .tooltip.show { opacity:1; }
+
+  /* modal */
+  .overlay {
+    position:fixed; inset:0; z-index:300;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,0.55); backdrop-filter:blur(5px);
+    opacity:0; pointer-events:none; transition:opacity 0.22s;
+  }
+  .overlay.open { opacity:1; pointer-events:all; }
+
+  .modal {
+    width:min(540px,93vw); max-height:82vh;
+    border:1px solid var(--border); background:rgba(2,9,7,0.98);
+    display:flex; flex-direction:column; overflow:hidden;
+    transform:translateY(14px) scale(0.98); transition:transform 0.22s;
+  }
+  .overlay.open .modal { transform:translateY(0) scale(1); }
+
+  .modal-head {
+    padding:16px 20px 12px;
+    border-bottom:1px solid var(--border);
+    display:flex; justify-content:space-between; align-items:flex-start;
+    flex-shrink:0;
+  }
+  .modal-name {
+    font-family:'Orbitron',sans-serif; font-size:0.82rem;
+    letter-spacing:0.16em; margin-bottom:5px;
+  }
+  .modal-sub { font-size:0.52rem; letter-spacing:0.14em; opacity:0.42; }
+
+  .modal-x {
+    background:none; border:1px solid rgba(0,255,180,0.2); color:var(--text);
+    font-family:'Share Tech Mono',monospace; font-size:0.58rem;
+    letter-spacing:0.1em; padding:4px 10px; cursor:pointer; transition:all 0.18s; flex-shrink:0;
+  }
+  .modal-x:hover { background:rgba(255,34,68,0.15); border-color:var(--red); color:var(--red); }
+
+  .modal-stats {
+    display:grid; grid-template-columns:repeat(3,1fr);
+    border-bottom:1px solid var(--border); flex-shrink:0;
+  }
+  .modal-stat {
+    padding:11px 16px; border-right:1px solid var(--border);
+    display:flex; flex-direction:column; gap:4px;
+  }
+  .modal-stat:last-child { border-right:none; }
+  .stat-lbl { font-size:0.47rem; letter-spacing:0.18em; opacity:0.38; }
+  .stat-val { font-family:'Orbitron',sans-serif; font-size:0.88rem; }
+
+  .threat-bar-bg { height:3px; background:rgba(255,255,255,0.06); flex-shrink:0; }
+  .threat-bar-fill { height:100%; transition:width 0.55s ease; }
+
+  .modal-body { padding:16px 20px; overflow-y:auto; flex:1; }
+  .modal-body::-webkit-scrollbar { width:3px; }
+  .modal-body::-webkit-scrollbar-thumb { background:rgba(0,255,180,0.18); border-radius:2px; }
+
+  .sec-label {
+    font-size:0.49rem; letter-spacing:0.22em; opacity:0.38;
+    margin-bottom:9px; padding-bottom:5px;
+    border-bottom:1px solid rgba(0,255,180,0.07);
+  }
+  .summary { font-size:0.67rem; line-height:1.72; letter-spacing:0.035em; opacity:0.86; margin-bottom:16px; }
+
+  .drivers { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
+  .driver-tag {
+    font-size:0.5rem; letter-spacing:0.1em; padding:3px 8px;
+    border:1px solid; opacity:0.78;
+  }
+
+  .events { display:flex; flex-direction:column; gap:7px; }
+  .ev {
+    border:1px solid rgba(0,255,180,0.07);
+    background:rgba(0,255,180,0.02);
+    padding:9px 12px;
+    display:grid; grid-template-columns:8px 1fr auto; gap:0 10px; align-items:start;
+  }
+  .ev-dot { width:7px; height:7px; border-radius:50%; margin-top:3px; }
+  .ev-text { font-size:0.62rem; line-height:1.5; letter-spacing:0.03em; opacity:0.84; }
+  .ev-time { font-size:0.49rem; letter-spacing:0.08em; opacity:0.32; white-space:nowrap; }
+
+  .loading { font-size:0.64rem; letter-spacing:0.12em; opacity:0.45; padding:22px 0; text-align:center; animation:blink 1.3s step-end infinite; }
+  @keyframes blink { 0%,100%{opacity:0.45} 50%{opacity:0.12} }
+
+  .modal-foot {
+    font-size:0.46rem; letter-spacing:0.09em; opacity:0.22;
+    padding:7px 20px; border-top:1px solid var(--border); flex-shrink:0; text-align:right;
+  }
+</style>
+</head>
+<body>
+
+<div class="corner corner-tl"></div>
+<div class="corner corner-tr"></div>
+<div class="corner corner-bl"></div>
+<div class="corner corner-br"></div>
+
+<div class="header">
+  <div class="logo">THREAT<span>WATCH</span></div>
+  <div class="status-bar">
+    <div class="s-item"><span class="s-label">FEED</span><span class="s-val"><span class="pulse-dot"></span>LIVE</span></div>
+    <div class="s-item"><span class="s-label">ACTIVE ZONES</span><span class="s-val" id="active-count">—</span></div>
+    <div class="s-item"><span class="s-label">LAST REFRESH</span><span class="s-val" id="last-update">—</span></div>
+    <div class="s-item"><span class="s-label">UTC</span><span class="s-val" id="utc-clock">—</span></div>
+  </div>
+</div>
+
+<div class="coords" id="coords">LAT — LON —</div>
+<canvas id="globe"></canvas>
+
+<div class="legend">
+  <div class="leg-item"><div class="leg-dot" style="background:#ff2244;box-shadow:0 0 7px #ff2244"></div>CRITICAL</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#ff8800;box-shadow:0 0 7px #ff8800"></div>HIGH</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#ffdd00;box-shadow:0 0 7px #ffdd00"></div>ELEVATED</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#00ffb4;box-shadow:0 0 7px #00ffb4"></div>MONITORED</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#1a6655"></div>STABLE</div>
+</div>
+
+<div class="ticker">
+  <div class="ticker-label">INTEL FEED</div>
+  <div class="ticker-content" id="ticker-text">INITIALIZING FEED...</div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-name" id="m-name">—</div>
+        <div class="modal-sub" id="m-sub">—</div>
+      </div>
+      <button class="modal-x" id="modal-close">✕ CLOSE</button>
+    </div>
+    <div class="modal-stats">
+      <div class="modal-stat"><span class="stat-lbl">THREAT LEVEL</span><span class="stat-val" id="m-level">—</span></div>
+      <div class="modal-stat"><span class="stat-lbl">EVENTS (30D)</span><span class="stat-val" id="m-events">—</span></div>
+      <div class="modal-stat"><span class="stat-lbl">ALERT STATUS</span><span class="stat-val" id="m-alert">—</span></div>
+    </div>
+    <div class="threat-bar-bg"><div class="threat-bar-fill" id="m-bar" style="width:0%"></div></div>
+    <div class="modal-body" id="m-body"><div class="loading">QUERYING INTELLIGENCE FEED...</div></div>
+    <div class="modal-foot" id="m-foot">SOURCE: AI INTELLIGENCE SYNTHESIS · REAL-TIME</div>
+  </div>
+</div>
+
+<script>
+// ── Canvas setup ──────────────────────────────────────────────────────────
+const canvas = document.getElementById('globe');
+const ctx = canvas.getContext('2d');
+let W, H, R;
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  R = Math.min(W, H) * 0.36;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ── Threat zones ──────────────────────────────────────────────────────────
+const threatZones = [
+  { lat:31.5,  lon:34.5,  r:0.16, level:0.96, name:"ISRAEL-GAZA CONFLICT ZONE",    country:"Israel / Palestine",  incidents:280, status:"CRITICAL",  category:"ARMED CONFLICT"        },
+  { lat:49.0,  lon:32.0,  r:0.20, level:0.92, name:"UKRAINE WAR ZONE",             country:"Ukraine",             incidents:310, status:"CRITICAL",  category:"INTERSTATE WAR"         },
+  { lat:15.5,  lon:32.5,  r:0.18, level:0.88, name:"SUDAN CIVIL WAR",              country:"Sudan",               incidents:195, status:"CRITICAL",  category:"CIVIL WAR"              },
+  { lat:15.3,  lon:44.2,  r:0.17, level:0.87, name:"YEMEN CONFLICT",               country:"Yemen",               incidents:170, status:"CRITICAL",  category:"ARMED CONFLICT"        },
+  { lat:14.0,  lon:2.0,   r:0.22, level:0.85, name:"SAHEL INSURGENCY BELT",        country:"Mali / Niger / Burkina Faso", incidents:145, status:"CRITICAL", category:"INSURGENCY"    },
+  { lat:6.5,   lon:21.0,  r:0.20, level:0.82, name:"CENTRAL AFRICA INSTABILITY",   country:"DRC / CAR",           incidents:130, status:"HIGH",      category:"ARMED CONFLICT"        },
+  { lat:33.5,  lon:36.3,  r:0.16, level:0.83, name:"SYRIA ONGOING CONFLICT",       country:"Syria",               incidents:105, status:"HIGH",      category:"CIVIL WAR"             },
+  { lat:34.5,  lon:69.2,  r:0.17, level:0.81, name:"AFGHANISTAN SECURITY CRISIS",  country:"Afghanistan",         incidents:120, status:"HIGH",      category:"GOVERNANCE COLLAPSE"   },
+  { lat:33.3,  lon:44.4,  r:0.15, level:0.79, name:"IRAQ SECURITY SITUATION",      country:"Iraq",                incidents:88,  status:"HIGH",      category:"TERRORISM"             },
+  { lat:9.0,   lon:38.7,  r:0.16, level:0.79, name:"ETHIOPIA INTERNAL CONFLICT",   country:"Ethiopia",            incidents:90,  status:"HIGH",      category:"CIVIL CONFLICT"        },
+  { lat:24.0,  lon:96.0,  r:0.15, level:0.78, name:"MYANMAR CIVIL WAR",            country:"Myanmar",             incidents:115, status:"HIGH",      category:"CIVIL WAR"             },
+  { lat:38.9,  lon:125.7, r:0.13, level:0.75, name:"KOREAN PENINSULA TENSION",     country:"North / South Korea", incidents:22,  status:"HIGH",      category:"GEOPOLITICAL"          },
+  { lat:23.5,  lon:121.0, r:0.13, level:0.73, name:"TAIWAN STRAIT TENSION",        country:"Taiwan / China",      incidents:18,  status:"HIGH",      category:"GEOPOLITICAL"          },
+  { lat:5.0,   lon:7.5,   r:0.15, level:0.70, name:"NIGER DELTA INSTABILITY",      country:"Nigeria",             incidents:58,  status:"HIGH",      category:"INSURGENCY"            },
+  { lat:43.5,  lon:41.0,  r:0.13, level:0.68, name:"SOUTH CAUCASUS TENSIONS",      country:"Armenia / Azerbaijan",incidents:35,  status:"HIGH",      category:"TERRITORIAL"           },
+  { lat:60.0,  lon:28.0,  r:0.14, level:0.65, name:"RUSSIA-NATO FRONTIER TENSION", country:"Finland / Baltic States", incidents:14, status:"ELEVATED", category:"GEOPOLITICAL"       },
+  { lat:11.5,  lon:43.1,  r:0.13, level:0.67, name:"HORN OF AFRICA TENSIONS",      country:"Ethiopia / Eritrea / Somalia", incidents:45, status:"ELEVATED", category:"REGIONAL TENSION" },
+  { lat:28.6,  lon:77.2,  r:0.13, level:0.52, name:"INDIA-PAKISTAN LOC TENSION",   country:"India / Pakistan",    incidents:28,  status:"ELEVATED",  category:"GEOPOLITICAL"          },
+  { lat:25.0,  lon:55.0,  r:0.12, level:0.50, name:"GULF MARITIME TENSIONS",       country:"Persian Gulf",        incidents:16,  status:"ELEVATED",  category:"MARITIME"              },
+  { lat:-0.5,  lon:37.0,  r:0.12, level:0.48, name:"EAST AFRICA RIFT TENSIONS",    country:"Kenya / Somalia",     incidents:30,  status:"ELEVATED",  category:"TERRORISM"             },
+  { lat:3.8,   lon:-59.0, r:0.11, level:0.42, name:"VENEZUELA-GUYANA DISPUTE",     country:"Venezuela / Guyana",  incidents:8,   status:"MONITORED", category:"TERRITORIAL"           },
+  { lat:-15.0, lon:30.0,  r:0.12, level:0.38, name:"SOUTHERN AFRICA UNREST",       country:"Mozambique / Zambia", incidents:20,  status:"MONITORED", category:"INSURGENCY"            },
+  { lat:52.0,  lon:60.0,  r:0.11, level:0.35, name:"CENTRAL ASIAN INSTABILITY",    country:"Kazakhstan / Kyrgyzstan", incidents:10, status:"MONITORED", category:"POLITICAL"         },
+  { lat:37.0,  lon:15.0,  r:0.10, level:0.28, name:"CENTRAL MED MIGRATION CRISIS", country:"Mediterranean Sea",   incidents:6,   status:"STABLE",    category:"HUMANITARIAN"          },
+];
+
+// ── GeoJSON ───────────────────────────────────────────────────────────────
+let geoFeatures = [], geoLoaded = false;
+(async () => {
+  try {
+    const res = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
+    const topo = await res.json();
+    const { arcs, transform: { scale, translate }, objects: { countries: land } } = topo;
+    function decodeArc(i) {
+      const rev = i < 0; const idx = rev ? ~i : i;
+      let x=0, y=0;
+      const pts = arcs[idx].map(([dx,dy]) => { x+=dx; y+=dy; return [x*scale[0]+translate[0], y*scale[1]+translate[1]]; });
+      return rev ? pts.reverse() : pts;
+    }
+    function toRings(g) {
+      if (!g) return [];
+      if (g.type==='Polygon') return g.arcs.map(r=>r.flatMap(decodeArc));
+      if (g.type==='MultiPolygon') return g.arcs.flatMap(p=>p.map(r=>r.flatMap(decodeArc)));
+      return [];
+    }
+    geoFeatures = land.geometries.map(g=>toRings(g)).filter(r=>r.length);
+    geoLoaded = true;
+  } catch(e) { console.warn('GeoJSON load failed', e); }
+})();
+
+// ── Globe state ───────────────────────────────────────────────────────────
+let rotX=0.3, rotY=-0.5, isDragging=false, dragMoved=false;
+let lastMX=0, lastMY=0, velX=0, velY=0;
+let zoomScale=1.0;
+const ZOOM_MIN=0.35, ZOOM_MAX=6.0;
+let hoveredZone=null, selectedZone=null;
+let time=0;
+
+const stars = Array.from({length:180}, ()=>({
+  x:Math.random()*2-1, y:Math.random()*2-1,
+  s:Math.random()*1.3+0.3, a:Math.random()*0.55+0.1
+}));
+
+// ── Math ──────────────────────────────────────────────────────────────────
+function ll3d(lat,lon) {
+  const phi=(90-lat)*Math.PI/180, theta=(lon+180)*Math.PI/180;
+  return {x:-Math.sin(phi)*Math.cos(theta), y:Math.cos(phi), z:Math.sin(phi)*Math.sin(theta)};
+}
+function rot(p) {
+  const x1=p.x*Math.cos(rotY)+p.z*Math.sin(rotY);
+  const z1=-p.x*Math.sin(rotY)+p.z*Math.cos(rotY);
+  return {x:x1, y:p.y*Math.cos(rotX)-z1*Math.sin(rotX), z:p.y*Math.sin(rotX)+z1*Math.cos(rotX)};
+}
+function proj(p) { const rz=R*zoomScale; return {x:W/2+p.x*rz, y:H/2-p.y*rz}; }
+function tColor(lv) {
+  if (lv>0.85) return {r:255,g:20,b:60};
+  if (lv>0.65) return {r:255,g:130,b:0};
+  if (lv>0.45) return {r:255,g:210,b:0};
+  if (lv>0.28) return {r:0,g:255,b:180};
+  return {r:20,g:120,b:90};
+}
+function rgba(c,a) { return `rgba(${c.r},${c.g},${c.b},${a})`; }
+
+// ── Draw ──────────────────────────────────────────────────────────────────
+function drawGrid() {
+  ctx.strokeStyle='rgba(0,255,180,0.055)'; ctx.lineWidth=0.5;
+  for (let lat=-80;lat<=80;lat+=20) {
+    ctx.beginPath(); let f=true;
+    for (let lon=-180;lon<=180;lon+=3) {
+      const r=rot(ll3d(lat,lon)); if(r.z<0){f=true;continue;}
+      const s=proj(r); if(f){ctx.moveTo(s.x,s.y);f=false;}else ctx.lineTo(s.x,s.y);
+    } ctx.stroke();
+  }
+  for (let lon=-180;lon<180;lon+=30) {
+    ctx.beginPath(); let f=true;
+    for (let lat=-90;lat<=90;lat+=3) {
+      const r=rot(ll3d(lat,lon)); if(r.z<0){f=true;continue;}
+      const s=proj(r); if(f){ctx.moveTo(s.x,s.y);f=false;}else ctx.lineTo(s.x,s.y);
+    } ctx.stroke();
+  }
+}
+
+function drawContinents() {
+  if (!geoLoaded) return;
+  ctx.lineWidth=0.7;
+  for (const rings of geoFeatures) {
+    for (const ring of rings) {
+      ctx.beginPath(); let pd=false;
+      for (const [lon,lat] of ring) {
+        const r=rot(ll3d(lat,lon)); if(r.z<0){pd=false;continue;}
+        const s=proj(r); if(!pd){ctx.moveTo(s.x,s.y);pd=true;}else ctx.lineTo(s.x,s.y);
+      }
+      ctx.strokeStyle='rgba(0,255,180,0.5)'; ctx.stroke();
+      ctx.fillStyle='rgba(0,255,180,0.055)'; ctx.fill();
+    }
+  }
+}
+
+function drawZone(z) {
+  const rc=rot(ll3d(z.lat,z.lon)); if(rc.z<0.05) return;
+  const sp=proj(rc);
+  const sr=z.r*R*zoomScale*(0.6+rc.z*0.4);
+  const c=tColor(z.level);
+  const pulse=0.5+0.5*Math.sin(time*2+z.lon*0.1);
+  const hov=hoveredZone===z, sel=selectedZone===z;
+
+  if (z.level>0.5) {
+    for (let i=3;i>=1;i--) {
+      ctx.beginPath(); ctx.arc(sp.x,sp.y,sr*(1+i*0.28+(hov?0.18:0)),0,Math.PI*2);
+      ctx.strokeStyle=rgba(c,(0.07/i)*z.level*(hov?1.6:1));
+      ctx.lineWidth=1; ctx.stroke();
+    }
+  }
+  const g=ctx.createRadialGradient(sp.x,sp.y,0,sp.x,sp.y,sr);
+  g.addColorStop(0,rgba(c,0.44+pulse*0.1*z.level));
+  g.addColorStop(0.5,rgba(c,0.17*z.level));
+  g.addColorStop(1,rgba(c,0));
+  ctx.beginPath(); ctx.arc(sp.x,sp.y,sr,0,Math.PI*2);
+  ctx.fillStyle=g; ctx.fill();
+
+  if (sel) {
+    ctx.beginPath(); ctx.arc(sp.x,sp.y,sr*0.38,0,Math.PI*2);
+    ctx.strokeStyle=rgba(c,0.9); ctx.lineWidth=1.5; ctx.stroke();
+  }
+  const dr=(hov||sel)?5.5:z.level*3+1.5;
+  ctx.beginPath(); ctx.arc(sp.x,sp.y,dr,0,Math.PI*2);
+  ctx.fillStyle=rgba(c,0.96);
+  ctx.shadowBlur=hov?18:10; ctx.shadowColor=rgba(c,1);
+  ctx.fill(); ctx.shadowBlur=0;
+
+  z._sx=sp.x; z._sy=sp.y; z._sr=sr; z._vis=true;
+}
+
+function draw() {
+  const Rz=R*zoomScale;
+  ctx.clearRect(0,0,W,H);
+
+  const bg=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)*0.7);
+  bg.addColorStop(0,'#030d0a'); bg.addColorStop(1,'#020408');
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+
+  stars.forEach(s=>{
+    const sp={x:W/2+s.x*W*0.6,y:H/2+s.y*H*0.6};
+    if(sp.x<0||sp.x>W||sp.y<0||sp.y>H) return;
+    ctx.beginPath(); ctx.arc(sp.x,sp.y,s.s*0.44,0,Math.PI*2);
+    ctx.fillStyle=`rgba(200,255,240,${s.a*(0.6+0.4*Math.sin(time+s.x*10))})`; ctx.fill();
+  });
+
+  const sg=ctx.createRadialGradient(W/2+Rz*0.18,H/2+Rz*0.18,0,W/2,H/2,Rz*1.1);
+  sg.addColorStop(0,'rgba(0,0,0,0)'); sg.addColorStop(0.8,'rgba(0,0,0,0)'); sg.addColorStop(1,'rgba(0,0,0,0.45)');
+  ctx.beginPath(); ctx.arc(W/2,H/2,Rz*1.1,0,Math.PI*2); ctx.fillStyle=sg; ctx.fill();
+
+  const gg=ctx.createRadialGradient(W/2-Rz*0.25,H/2-Rz*0.25,0,W/2,H/2,Rz);
+  gg.addColorStop(0,'#0a2a20'); gg.addColorStop(0.5,'#061a12'); gg.addColorStop(1,'#020c08');
+  ctx.beginPath(); ctx.arc(W/2,H/2,Rz,0,Math.PI*2); ctx.fillStyle=gg; ctx.fill();
+
+  ctx.beginPath(); ctx.arc(W/2,H/2,Rz,0,Math.PI*2);
+  ctx.strokeStyle='rgba(0,255,180,0.14)'; ctx.lineWidth=1; ctx.stroke();
+
+  const ag=ctx.createRadialGradient(W/2,H/2,Rz*0.9,W/2,H/2,Rz*1.15);
+  ag.addColorStop(0,'rgba(0,255,180,0.07)'); ag.addColorStop(1,'rgba(0,255,180,0)');
+  ctx.beginPath(); ctx.arc(W/2,H/2,Rz*1.15,0,Math.PI*2); ctx.fillStyle=ag; ctx.fill();
+
+  ctx.save();
+  ctx.beginPath(); ctx.arc(W/2,H/2,Rz,0,Math.PI*2); ctx.clip();
+  drawGrid(); drawContinents();
+  threatZones.forEach(z=>z._vis=false);
+  [...threatZones].sort((a,b)=>rot(ll3d(a.lat,a.lon)).z-rot(ll3d(b.lat,b.lon)).z).forEach(drawZone);
+
+  const spec=ctx.createRadialGradient(W/2-Rz*0.4,H/2-Rz*0.35,0,W/2-Rz*0.1,H/2-Rz*0.1,Rz*0.8);
+  spec.addColorStop(0,'rgba(0,255,180,0.05)'); spec.addColorStop(0.4,'rgba(0,255,180,0.015)'); spec.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=spec; ctx.fillRect(W/2-Rz,H/2-Rz,Rz*2,Rz*2);
+  ctx.restore();
+  time+=0.016;
+}
+
+// ── Interaction ───────────────────────────────────────────────────────────
+canvas.addEventListener('mousedown', e=>{
+  isDragging=true; dragMoved=false;
+  lastMX=e.clientX; lastMY=e.clientY;
+  velX=0; velY=0;
+});
+
+window.addEventListener('mousemove', e=>{
+  if (isDragging) {
+    const dx=e.clientX-lastMX, dy=e.clientY-lastMY;
+    if (Math.abs(dx)>2||Math.abs(dy)>2) dragMoved=true;
+    velY=dx*0.005; velX=dy*0.005;
+    rotY+=dx*0.005; rotX+=dy*0.005;
+    rotX=Math.max(-1.4,Math.min(1.4,rotX));
+    lastMX=e.clientX; lastMY=e.clientY;
+  }
+
+  const mx=e.clientX, my=e.clientY;
+  let found=null;
+  threatZones.forEach(z=>{
+    if (!z._vis) return;
+    const d=Math.sqrt((mx-z._sx)**2+(my-z._sy)**2);
+    if (d<Math.max(z._sr*1.1,14)) { if(!found||z.level>found.level) found=z; }
+  });
+  hoveredZone=found;
+
+  const tt=document.getElementById('tooltip');
+  if (found) {
+    const c=tColor(found.level);
+    tt.style.left=(mx+15)+'px'; tt.style.top=(my-8)+'px';
+    tt.style.borderColor=`rgb(${c.r},${c.g},${c.b})`;
+    tt.style.color=`rgb(${c.r},${c.g},${c.b})`;
+    tt.textContent=found.name+' · '+found.status+' · CLICK FOR INTEL';
+    tt.classList.add('show');
+    canvas.style.cursor='pointer';
+  } else {
+    tt.classList.remove('show');
+    canvas.style.cursor=isDragging?'grabbing':'grab';
+  }
+
+  const px=(mx-W/2)/(R*zoomScale), py=-(my-H/2)/(R*zoomScale);
+  if (px*px+py*py<=1) {
+    const pz=Math.sqrt(1-px*px-py*py);
+    const cX=Math.cos(-rotX),sX=Math.sin(-rotX);
+    const ry2=py*cX-pz*sX, rz1=py*sX+pz*cX;
+    const cY=Math.cos(-rotY),sY=Math.sin(-rotY);
+    const rx1=px*cY+rz1*sY, rz2=-px*sY+rz1*cY;
+    const lat=-(Math.acos(Math.max(-1,Math.min(1,ry2)))*180/Math.PI-90);
+    const lon=Math.atan2(rz2,rx1)*180/Math.PI-180;
+    document.getElementById('coords').textContent=`LAT ${lat.toFixed(1)}°  LON ${lon.toFixed(1)}°`;
+  }
+});
+
+window.addEventListener('mouseup', ()=>{
+  if (!dragMoved && hoveredZone) openModal(hoveredZone);
+  isDragging=false;
+});
+
+canvas.addEventListener('wheel', e=>{
+  e.preventDefault();
+  zoomScale=Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,zoomScale*(e.deltaY<0?1.08:0.925)));
+},{passive:false});
+
+let lastPinch=null;
+canvas.addEventListener('touchstart', e=>{
+  if (e.touches.length===1) {
+    isDragging=true; dragMoved=false;
+    lastMX=e.touches[0].clientX; lastMY=e.touches[0].clientY;
+    velX=0; velY=0;
+  } else if (e.touches.length===2) {
+    const dx=e.touches[0].clientX-e.touches[1].clientX;
+    const dy=e.touches[0].clientY-e.touches[1].clientY;
+    lastPinch=Math.sqrt(dx*dx+dy*dy);
+  }
+  e.preventDefault();
+},{passive:false});
+
+canvas.addEventListener('touchmove', e=>{
+  if (e.touches.length===1&&isDragging) {
+    const dx=e.touches[0].clientX-lastMX, dy=e.touches[0].clientY-lastMY;
+    if (Math.abs(dx)>2||Math.abs(dy)>2) dragMoved=true;
+    velY=dx*0.005; velX=dy*0.005;
+    rotY+=dx*0.005; rotX+=dy*0.005;
+    rotX=Math.max(-1.4,Math.min(1.4,rotX));
+    lastMX=e.touches[0].clientX; lastMY=e.touches[0].clientY;
+  } else if (e.touches.length===2&&lastPinch) {
+    const dx=e.touches[0].clientX-e.touches[1].clientX;
+    const dy=e.touches[0].clientY-e.touches[1].clientY;
+    const d=Math.sqrt(dx*dx+dy*dy);
+    zoomScale=Math.max(ZOOM_MIN,Math.min(ZOOM_MAX,zoomScale*(d/lastPinch)));
+    lastPinch=d;
+  }
+  e.preventDefault();
+},{passive:false});
+
+canvas.addEventListener('touchend', e=>{
+  if (e.touches.length<2) lastPinch=null;
+  if (e.touches.length===0) { isDragging=false; }
+});
+
+function animate() {
+  if (!isDragging) {
+    rotY+=velY; rotX+=velX;
+    velY*=0.92; velX*=0.92;
+    if (Math.abs(velY)<0.0001) velY=0;
+    if (Math.abs(velX)<0.0001) velX=0;
+    rotX=Math.max(-1.4,Math.min(1.4,rotX));
+  }
+  draw();
+  requestAnimationFrame(animate);
+}
+animate();
+
+// ── Clock ─────────────────────────────────────────────────────────────────
+setInterval(()=>{
+  const n=new Date();
+  document.getElementById('utc-clock').textContent=
+    String(n.getUTCHours()).padStart(2,'0')+':'+
+    String(n.getUTCMinutes()).padStart(2,'0')+':'+
+    String(n.getUTCSeconds()).padStart(2,'0');
+},1000);
+
+document.getElementById('active-count').textContent = threatZones.filter(z=>z.level>0.6).length;
+
+// ── Live ticker via Claude API ────────────────────────────────────────────
+async function refreshTicker() {
+  const today=new Date().toISOString().split('T')[0];
+  const zones=threatZones.filter(z=>z.level>0.65).map(z=>z.name).slice(0,10).join(', ');
+  const prompt=`Today is ${today}. You are a live geopolitical intelligence ticker. Generate 9 brief alert strings (each 8-14 words, realistic, specific) for these active conflict zones: ${zones}. Use prefixes like ALERT, WARNING, UPDATE, CRITICAL, INTEL. Return ONLY a JSON array of strings, no markdown.`;
+  try {
+    const r=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:700,messages:[{role:'user',content:prompt}]})
+    });
+    const d=await r.json();
+    const txt=d.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim();
+    const arr=JSON.parse(txt);
+    if (Array.isArray(arr)&&arr.length) {
+      const t=arr.map(a=>'⬥ '+a).join('   ·   ');
+      document.getElementById('ticker-text').textContent=t+'   ·   '+t;
+      document.getElementById('last-update').textContent=new Date().toUTCString().slice(17,25);
+    }
+  } catch {
+    const fb=threatZones.filter(z=>z.level>0.65).map(z=>`⬥ ${z.status}: ${z.name} — ${z.incidents} events`).join('   ·   ');
+    document.getElementById('ticker-text').textContent=fb+'   ·   '+fb;
+    document.getElementById('last-update').textContent=new Date().toUTCString().slice(17,25);
+  }
+}
+refreshTicker();
+setInterval(refreshTicker,5*60*1000);
+
+// ── Modal ─────────────────────────────────────────────────────────────────
+const overlay=document.getElementById('overlay');
+document.getElementById('modal-close').addEventListener('click',closeModal);
+overlay.addEventListener('click',e=>{if(e.target===overlay)closeModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+
+function closeModal() { overlay.classList.remove('open'); selectedZone=null; }
+
+async function openModal(zone) {
+  selectedZone=zone;
+  const c=tColor(zone.level);
+  const col=`rgb(${c.r},${c.g},${c.b})`;
+
+  document.getElementById('m-name').textContent=zone.name;
+  document.getElementById('m-name').style.color=col;
+  document.getElementById('m-sub').textContent=zone.category+' · '+zone.country;
+  document.getElementById('m-level').textContent=zone.status;
+  document.getElementById('m-level').style.color=col;
+  document.getElementById('m-events').textContent=zone.incidents;
+  document.getElementById('m-alert').textContent=zone.level>0.85?'IMMEDIATE':zone.level>0.65?'ELEVATED':'ACTIVE';
+  document.getElementById('m-bar').style.width=(zone.level*100)+'%';
+  document.getElementById('m-bar').style.background=col;
+  document.getElementById('m-bar').style.boxShadow=`0 0 12px ${col}`;
+  document.getElementById('m-body').innerHTML='<div class="loading">QUERYING INTELLIGENCE FEED...</div>';
+  overlay.classList.add('open');
+
+  const today=new Date().toISOString().split('T')[0];
+  const prompt=`Today is ${today}. You are a real-time geopolitical intelligence analyst. Provide an intelligence brief on: "${zone.name}" (country: ${zone.country}, category: ${zone.category}, threat: ${zone.status}, ~${zone.incidents} events in 30 days).
+
+Return ONLY a JSON object:
+{
+  "summary": "2-3 sentences describing the current situation as of today with specific realistic details",
+  "events": [
+    {"text": "specific realistic event description (1 sentence)", "time": "Xh ago or Xd ago"},
+    ... 5 events total
+  ],
+  "drivers": ["key driver 1", "key driver 2", "key driver 3"],
+  "outlook": "1 sentence near-term forecast"
+}
+No markdown, no explanation, only JSON.`;
+
+  try {
+    const r=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+    });
+    const d=await r.json();
+    const txt=d.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim();
+    renderModal(JSON.parse(txt),zone,col);
+  } catch(e) {
+    document.getElementById('m-body').innerHTML=`
+      <div class="sec-label">SITUATION REPORT</div>
+      <div class="summary">Intelligence feed temporarily unavailable. ${zone.incidents} events recorded in the past 30 days. Threat level maintained at ${zone.status}. Continuous monitoring active.</div>`;
+  }
+}
+
+function renderModal(intel, zone, col) {
+  let html=`<div class="sec-label">SITUATION REPORT</div><div class="summary">${intel.summary}</div>`;
+
+  if (intel.drivers?.length) {
+    html+=`<div class="sec-label" style="margin-top:2px">THREAT DRIVERS</div><div class="drivers">`;
+    intel.drivers.forEach(d=>{
+      html+=`<span class="driver-tag" style="border-color:${col};color:${col}">${d}</span>`;
+    });
+    html+=`</div>`;
+  }
+
+  if (intel.events?.length) {
+    html+=`<div class="sec-label">RECENT ACTIVITY</div><div class="events">`;
+    intel.events.forEach(ev=>{
+      html+=`<div class="ev">
+        <div class="ev-dot" style="background:${col};box-shadow:0 0 5px ${col}"></div>
+        <div class="ev-text">${ev.text}</div>
+        <div class="ev-time">${ev.time}</div>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+  if (intel.outlook) {
+    html+=`<div class="sec-label" style="margin-top:14px">NEAR-TERM OUTLOOK</div>
+    <div class="summary" style="border-left:2px solid ${col};padding-left:10px;opacity:0.75">${intel.outlook}</div>`;
+  }
+
+  document.getElementById('m-body').innerHTML=html;
+  document.getElementById('m-foot').textContent=
+    `SOURCE: AI INTELLIGENCE SYNTHESIS · ${new Date().toUTCString().slice(0,25).toUpperCase()} UTC`;
+}
+</script>
+</body>
+</html>
