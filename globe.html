@@ -1,0 +1,2427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>THREATWATCH — Global Intelligence</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://d3js.org/topojson.v3.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;500;700&display=swap');
+    
+    :root {
+      --accent: #00ffb4;
+      --accent-dim: rgba(0,255,180,0.5);
+      --bg-dark: #808080;
+      --bg-panel: rgba(2,9,7,0.95);
+      --border: rgba(0,255,180,0.12);
+      --text: #c8fff0;
+      --text-dim: rgba(200,255,240,0.6);
+      --critical: #ff3b5c;
+      --high: #ff9500;
+      --elevated: #ffd000;
+      --monitored: #00ff88;
+      --stable: #00d4aa;
+    }
+    
+    body {
+      font-family: 'Share Tech Mono', monospace;
+      background: var(--bg-dark);
+      color: var(--text);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+    
+    /* Animated background effect */
+    .bg-effect {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+      pointer-events: none;
+      background: #808080;
+    }
+    
+    /* Retro horizon grid */
+    .bg-grid {
+      position: absolute;
+      left: -20%;
+      right: -20%;
+      top: 45%;
+      bottom: -35%;
+      transform: perspective(550px) rotateX(70deg);
+      transform-origin: center top;
+      background-image:
+        linear-gradient(rgba(0, 245, 255, 0.35) 2px, transparent 2px),
+        linear-gradient(90deg, rgba(255, 59, 181, 0.25) 2px, transparent 2px);
+      background-size: 110px 70px, 80px 80px;
+      animation: gridMove 10s linear infinite;
+      opacity: 0.8;
+    }
+    
+    @keyframes gridMove {
+      0% { background-position: 0 0, 0 0; }
+      100% { background-position: 0 120px, 80px 0; }
+    }
+    
+    /* Sunset disc and glow */
+    .bg-radar {
+      position: absolute;
+      top: 11%;
+      left: 50%;
+      width: 420px;
+      height: 420px;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      background:
+        repeating-linear-gradient(
+          to bottom,
+          rgba(255, 218, 153, 0.95) 0 14px,
+          rgba(255, 93, 177, 0.98) 14px 24px
+        );
+      box-shadow:
+        0 0 60px rgba(255, 94, 184, 0.35),
+        0 0 150px rgba(255, 110, 31, 0.25);
+      clip-path: inset(0 0 45% 0);
+      animation: sunPulse 5s ease-in-out infinite;
+      opacity: 0.9;
+    }
+    
+    @keyframes sunPulse {
+      0%, 100% { transform: translateX(-50%) scale(1); }
+      50% { transform: translateX(-50%) scale(1.03); }
+    }
+    
+    /* Floating stars */
+    .bg-particles {
+      position: absolute;
+      inset: 0;
+    }
+    
+    .particle {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      background: #d6f2ff;
+      border-radius: 50%;
+      opacity: 0;
+      box-shadow: 0 0 8px rgba(214, 242, 255, 0.85);
+      animation: particleFloat 15s infinite;
+    }
+    
+    @keyframes particleFloat {
+      0% { opacity: 0; transform: translateY(90vh) scale(0.5); }
+      20% { opacity: 0.85; }
+      80% { opacity: 0.65; }
+      100% { opacity: 0; transform: translateY(-120px) scale(1); }
+    }
+    
+    /* Neon glow clouds */
+    .bg-orbs {
+      position: absolute;
+      inset: 0;
+    }
+    
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: 0.18;
+      animation: orbFloat 24s ease-in-out infinite;
+    }
+    
+    .orb-1 {
+      width: 430px;
+      height: 430px;
+      background: radial-gradient(circle, rgba(255, 59, 181, 0.6) 0%, transparent 70%);
+      top: 2%;
+      left: 8%;
+      animation-delay: 0s;
+    }
+    
+    .orb-2 {
+      width: 340px;
+      height: 340px;
+      background: radial-gradient(circle, rgba(0, 245, 255, 0.5) 0%, transparent 72%);
+      top: 56%;
+      right: 6%;
+      animation-delay: -8s;
+    }
+    
+    .orb-3 {
+      width: 390px;
+      height: 390px;
+      background: radial-gradient(circle, rgba(255, 132, 0, 0.4) 0%, transparent 68%);
+      bottom: -2%;
+      left: 34%;
+      animation-delay: -15s;
+    }
+    
+    @keyframes orbFloat {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      25% { transform: translate(24px, -26px) scale(1.08); }
+      50% { transform: translate(-22px, 16px) scale(0.92); }
+      75% { transform: translate(18px, 24px) scale(1.04); }
+    }
+    
+    /* Circuit lines */
+    .bg-circuits {
+      position: absolute;
+      inset: 0;
+      opacity: 0.12;
+    }
+    
+    .circuit-line {
+      position: absolute;
+      background: linear-gradient(90deg, transparent, #00f5ff, transparent);
+      height: 1px;
+      animation: circuitPulse 4s ease-in-out infinite;
+    }
+    
+    .circuit-line:nth-child(1) { top: 20%; width: 30%; left: 0; animation-delay: 0s; }
+    .circuit-line:nth-child(2) { top: 40%; width: 25%; right: 0; animation-delay: 1s; }
+    .circuit-line:nth-child(3) { top: 60%; width: 35%; left: 10%; animation-delay: 2s; }
+    .circuit-line:nth-child(4) { top: 80%; width: 20%; right: 5%; animation-delay: 3s; }
+    
+    .circuit-v-line {
+      position: absolute;
+      background: linear-gradient(180deg, transparent, #ff3bb5, transparent);
+      width: 1px;
+      animation: circuitPulse 4s ease-in-out infinite;
+    }
+    
+    .circuit-v-line:nth-child(5) { left: 15%; height: 25%; top: 0; animation-delay: 0.5s; }
+    .circuit-v-line:nth-child(6) { right: 20%; height: 30%; bottom: 0; animation-delay: 1.5s; }
+    .circuit-v-line:nth-child(7) { left: 40%; height: 20%; top: 30%; animation-delay: 2.5s; }
+    .circuit-v-line:nth-child(8) { right: 35%; height: 35%; bottom: 10%; animation-delay: 3.5s; }
+    
+    @keyframes circuitPulse {
+      0%, 100% { opacity: 0.1; }
+      50% { opacity: 0.8; }
+    }
+    
+    /* Data streams */
+    .bg-data-stream {
+      position: absolute;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      color: #ff90dd;
+      opacity: 0.1;
+      white-space: nowrap;
+      animation: dataScroll 30s linear infinite;
+    }
+    
+    .bg-data-stream:nth-child(1) { top: 5%; animation-delay: 0s; }
+    .bg-data-stream:nth-child(2) { top: 25%; animation-delay: -10s; }
+    .bg-data-stream:nth-child(3) { top: 45%; animation-delay: -20s; }
+    .bg-data-stream:nth-child(4) { top: 65%; animation-delay: -5s; }
+    .bg-data-stream:nth-child(5) { top: 85%; animation-delay: -15s; }
+    
+    @keyframes dataScroll {
+      0% { transform: translateX(100vw); }
+      100% { transform: translateX(-100%); }
+    }
+    
+    /* Vignette overlay */
+    .bg-vignette {
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.35) 100%),
+        radial-gradient(ellipse at center, transparent 32%, rgba(0,0,0,0.72) 100%);
+    }
+    
+    .container {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+      position: relative;
+      z-index: 1;
+    }
+    
+    /* Left Panel */
+    .left-panel {
+      width: 340px;
+      min-width: 340px;
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+      transition: width 0.25s ease, min-width 0.25s ease;
+      overflow: hidden;
+    }
+
+    .left-panel.collapsed {
+      width: 48px;
+      min-width: 48px;
+    }
+    
+    .panel-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      transition: padding 0.25s ease;
+    }
+
+    .left-panel.collapsed .panel-header {
+      padding: 10px 8px;
+      border-bottom: none;
+    }
+    
+    .panel-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      opacity: 0.6;
+    }
+
+    .left-panel.collapsed .panel-title,
+    .left-panel.collapsed .status-bar,
+    .left-panel.collapsed .watchlist,
+    .left-panel.collapsed .conflict-list {
+      display: none;
+    }
+
+    .panel-toggle {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 28px;
+      height: 28px;
+      border: 1px solid var(--border);
+      background: rgba(0,255,180,0.04);
+      color: var(--text);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 14px;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .panel-toggle:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .left-panel.collapsed .panel-toggle {
+      position: static;
+      display: block;
+      margin: 0 auto;
+    }
+    
+    .live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--critical);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--critical), 0 0 16px var(--critical);
+      animation: pulse 1s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 8px var(--critical), 0 0 16px var(--critical); }
+      50% { opacity: 0.55; transform: scale(1.45); box-shadow: 0 0 18px var(--critical), 0 0 30px var(--critical); }
+    }
+    
+    .conflict-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .watchlist {
+      border-bottom: 1px solid var(--border);
+      padding: 8px;
+      display: grid;
+      gap: 6px;
+      background: rgba(0,255,180,0.015);
+    }
+
+    .watch-tier {
+      border: 1px solid var(--border);
+      padding: 6px;
+      min-height: 44px;
+      background: rgba(0,0,0,0.2);
+    }
+
+    .watch-tier-title {
+      font-size: 8px;
+      letter-spacing: 0.15em;
+      margin-bottom: 4px;
+      opacity: 0.75;
+    }
+
+    .watch-tier-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .watch-item {
+      font-size: 8px;
+      padding: 2px 6px;
+      border: 1px solid;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+
+    .watch-tier.immediate .watch-tier-title { color: #ff3b5c; }
+    .watch-tier.near .watch-tier-title { color: #ffd000; }
+    .watch-tier.monitor .watch-tier-title { color: #00ff88; }
+
+    .watch-empty {
+      font-size: 8px;
+      opacity: 0.45;
+      letter-spacing: 0.08em;
+    }
+    
+    .conflict-list::-webkit-scrollbar {
+      width: 4px;
+    }
+    
+    .conflict-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .conflict-list::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+    
+    .conflict-card {
+      padding: 12px;
+      margin-bottom: 6px;
+      border: 1px solid var(--border);
+      background: rgba(0,255,180,0.02);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .conflict-card:hover {
+      border-color: var(--accent);
+      background: rgba(0,255,180,0.06);
+    }
+    
+    .conflict-card.active {
+      border-color: var(--accent);
+      background: rgba(0,255,180,0.08);
+    }
+    
+    .conflict-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 6px;
+    }
+    
+    .conflict-name {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+    }
+    
+    .danger-badge {
+      font-size: 8px;
+      padding: 2px 6px;
+      letter-spacing: 0.1em;
+      border: 1px solid;
+    }
+    
+    .conflict-meta {
+      font-size: 9px;
+      opacity: 0.5;
+      letter-spacing: 0.08em;
+    }
+
+    .watch-actions {
+      margin-top: 8px;
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .watch-btn {
+      border: 1px solid var(--border);
+      background: rgba(0,255,180,0.03);
+      color: var(--text);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 8px;
+      padding: 2px 5px;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+    }
+
+    .watch-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    
+    /* Globe Area */
+    .globe-area {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    
+    /* Old Console Screen Effect */
+    .console-screen {
+      position: absolute;
+      inset: 20px;
+      background: 
+        radial-gradient(ellipse at center, rgba(0,40,25,1) 0%, rgba(0,20,12,1) 50%, rgba(0,10,6,1) 100%);
+      border: 6px solid #0a1510;
+      border-radius: 30px;
+      box-shadow: 
+        inset 0 0 150px rgba(0,255,180,0.15),
+        inset 0 0 80px rgba(0,255,180,0.1),
+        inset 0 0 300px rgba(0,80,50,0.3),
+        0 0 60px rgba(0,0,0,1),
+        0 0 100px rgba(0,0,0,0.8),
+        0 0 3px rgba(0,255,180,0.5);
+      overflow: hidden;
+      z-index: 1;
+    }
+    
+    /* CRT screen curvature effect */
+    .console-screen::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 0%, transparent 60%, rgba(0,0,0,0.4) 100%);
+      border-radius: 20px;
+      pointer-events: none;
+    }
+    
+    /* Phosphor glow effect */
+    .console-screen::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center, rgba(0,255,180,0.04) 0%, transparent 50%);
+      border-radius: 20px;
+      pointer-events: none;
+      animation: phosphorFlicker 0.1s infinite;
+    }
+    
+    @keyframes phosphorFlicker {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.97; }
+    }
+    
+    /* Inner screen bezel */
+    .console-bezel {
+      position: absolute;
+      inset: 8px;
+      border: 1px solid rgba(0,255,180,0.08);
+      border-radius: 15px;
+      pointer-events: none;
+    }
+    
+    /* Screen reflection */
+    .console-reflection {
+      position: absolute;
+      top: -20%;
+      left: -20%;
+      width: 80%;
+      height: 60%;
+      background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 50%);
+      transform: rotate(-5deg);
+      pointer-events: none;
+      border-radius: 50%;
+    }
+    
+    /* Console frame/housing */
+    .console-frame {
+      position: absolute;
+      inset: 10px;
+      border: 15px solid #050807;
+      border-radius: 35px;
+      background: linear-gradient(160deg, #0f1512 0%, #080a09 50%, #040605 100%);
+      box-shadow: 
+        inset 0 5px 15px rgba(0,0,0,1),
+        inset 0 -5px 15px rgba(0,0,0,0.8),
+        inset 0 0 30px rgba(0,0,0,0.5),
+        0 15px 50px rgba(0,0,0,0.9),
+        0 0 0 3px rgba(0,255,180,0.15),
+        0 0 0 6px rgba(0,40,30,0.5);
+      pointer-events: none;
+      z-index: 0;
+    }
+    
+    .console-frame::before {
+      content: 'TACTICAL DISPLAY UNIT';
+      position: absolute;
+      top: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Orbitron', monospace;
+      font-size: 8px;
+      letter-spacing: 0.3em;
+      color: rgba(0,255,180,0.4);
+      background: #050807;
+      padding: 2px 15px;
+      border-radius: 3px;
+    }
+    
+    .console-frame::after {
+      content: '';
+      position: absolute;
+      inset: -15px;
+      border-radius: 35px;
+      border: 2px solid rgba(0,255,180,0.12);
+      box-shadow: inset 0 0 20px rgba(0,255,180,0.05);
+    }
+    
+    /* Console ventilation lines */
+    .console-vents {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+      pointer-events: none;
+      z-index: 5;
+    }
+    
+    .console-vent {
+      width: 50px;
+      height: 4px;
+      background: linear-gradient(90deg, transparent, rgba(0,255,180,0.2), transparent);
+      border-radius: 2px;
+      box-shadow: 0 0 8px rgba(0,255,180,0.15), inset 0 1px 2px rgba(0,0,0,0.5);
+    }
+    
+    /* Console status LEDs */
+    .console-leds {
+      position: absolute;
+      top: 35px;
+      right: 40px;
+      display: flex;
+      gap: 12px;
+      pointer-events: none;
+      z-index: 5;
+    }
+    
+    .console-led {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      box-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+    }
+    
+    .console-led.green {
+      background: #00ff88;
+      color: #00ff88;
+      animation: ledBlink 2s infinite;
+    }
+    
+    .console-led.amber {
+      background: #ffaa00;
+      color: #ffaa00;
+      animation: ledBlink 1.5s infinite 0.5s;
+    }
+    
+    .console-led.red {
+      background: #ff3b5c;
+      color: #ff3b5c;
+      animation: ledPulse 1s infinite;
+    }
+    
+    @keyframes ledBlink {
+      0%, 90%, 100% { opacity: 1; }
+      95% { opacity: 0.3; }
+    }
+    
+    @keyframes ledPulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 10px #ff3b5c, 0 0 20px #ff3b5c; }
+      50% { opacity: 0.6; box-shadow: 0 0 5px #ff3b5c, 0 0 10px #ff3b5c; }
+    }
+    
+    /* Console label */
+    .console-label {
+      position: absolute;
+      bottom: 45px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.6em;
+      color: rgba(0,255,180,0.5);
+      text-shadow: 0 0 15px rgba(0,255,180,0.4), 0 0 30px rgba(0,255,180,0.2);
+      pointer-events: none;
+      z-index: 5;
+    }
+    
+    /* Heavy scanlines for CRT effect - over everything */
+    .crt-scanlines {
+      position: absolute;
+      inset: 20px;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.2) 2px,
+        rgba(0,0,0,0.2) 4px
+      );
+      pointer-events: none;
+      border-radius: 30px;
+      z-index: 20;
+    }
+    
+    /* Screen noise/static */
+    .screen-noise {
+      position: absolute;
+      inset: 0;
+      opacity: 0.02;
+      pointer-events: none;
+      border-radius: 15px;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23noise)'/%3E%3C/svg%3E");
+      animation: noiseMove 0.5s steps(10) infinite;
+    }
+    
+    @keyframes noiseMove {
+      0% { transform: translate(0, 0); }
+      100% { transform: translate(-10px, -10px); }
+    }
+    
+    #globe-canvas {
+      cursor: grab;
+      position: relative;
+      z-index: 10;
+    }
+    
+    #globe-canvas:active {
+      cursor: grabbing;
+    }
+    
+    /* Tooltip */
+    .tooltip {
+      position: fixed;
+      padding: 10px 14px;
+      background: var(--bg-panel);
+      border: 1px solid var(--accent);
+      font-size: 10px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 1000;
+      max-width: 220px;
+    }
+    
+    .tooltip.visible {
+      opacity: 1;
+    }
+    
+    .tooltip-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      color: var(--accent);
+      margin-bottom: 4px;
+      letter-spacing: 0.1em;
+    }
+    
+    .tooltip-status {
+      font-size: 9px;
+      opacity: 0.7;
+      margin-bottom: 6px;
+    }
+    
+    .tooltip-hint {
+      font-size: 8px;
+      opacity: 0.5;
+      letter-spacing: 0.15em;
+    }
+    
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      z-index: 1600;
+      pointer-events: none;
+    }
+    
+    .modal-overlay.visible {
+      display: block;
+    }
+    
+    .modal {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      bottom: 95px;
+      width: min(480px, calc(100vw - 84px));
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      pointer-events: auto;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.65);
+      transform: scale(0.92);
+      transform-origin: top right;
+      opacity: 0;
+      transition: transform 0.22s ease, opacity 0.22s ease, box-shadow 0.22s ease;
+    }
+
+    .modal-overlay.visible .modal {
+      transform: scale(1);
+      opacity: 1;
+      box-shadow: 0 16px 44px rgba(0,0,0,0.75), 0 0 32px rgba(0,255,180,0.12);
+      animation: modalPopIn 0.26s ease;
+    }
+
+    .modal-overlay.closing .modal {
+      transform: scale(0.9);
+      opacity: 0;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.4);
+    }
+
+    .modal-header,
+    .modal-body {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    .modal-overlay.visible .modal-header {
+      opacity: 1;
+      transform: translateY(0);
+      transition: opacity 0.2s ease 0.08s, transform 0.2s ease 0.08s;
+    }
+
+    .modal-overlay.visible .modal-body {
+      opacity: 1;
+      transform: translateY(0);
+      transition: opacity 0.22s ease 0.13s, transform 0.22s ease 0.13s;
+    }
+
+    .modal-overlay.closing .modal-header,
+    .modal-overlay.closing .modal-body {
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.14s ease, transform 0.14s ease;
+    }
+
+    @keyframes modalPopIn {
+      0% { transform: scale(0.88); }
+      60% { transform: scale(1.02); }
+      100% { transform: scale(1); }
+    }
+    
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    
+    .modal-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 14px;
+      letter-spacing: 0.15em;
+    }
+    
+    .modal-subtitle {
+      font-size: 10px;
+      opacity: 0.5;
+      margin-top: 4px;
+      letter-spacing: 0.1em;
+    }
+    
+    .modal-close {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 28px;
+      height: 28px;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    
+    .modal-close:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    
+    .modal-body::-webkit-scrollbar {
+      width: 4px;
+    }
+    
+    .modal-body::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .modal-body::-webkit-scrollbar-thumb {
+      background: var(--border);
+    }
+    
+    .intel-section {
+      margin-bottom: 20px;
+    }
+
+    .intel-image-wrap {
+      margin-bottom: 14px;
+      border: 1px solid var(--border);
+      background: rgba(0,255,180,0.02);
+      overflow: hidden;
+    }
+
+    .intel-image {
+      display: block;
+      width: 100%;
+      height: 170px;
+      object-fit: cover;
+      filter: saturate(1.06) contrast(1.04);
+    }
+
+    .flag-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0;
+      height: 170px;
+    }
+
+    .flag-grid.multi {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .flag-photo {
+      width: 100%;
+      height: 170px;
+      object-fit: cover;
+      display: block;
+      background: #0b1626;
+    }
+
+    .intel-image-caption {
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      opacity: 0.6;
+      padding: 7px 10px;
+      border-top: 1px solid var(--border);
+    }
+    
+    .intel-label {
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      opacity: 0.4;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .intel-text {
+      font-size: 11px;
+      line-height: 1.6;
+      opacity: 0.8;
+      letter-spacing: 0.03em;
+    }
+    
+    .intel-drivers {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    
+    .driver-tag {
+      font-size: 9px;
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      background: rgba(0,255,180,0.03);
+      letter-spacing: 0.05em;
+    }
+    
+    .intel-events {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .event-item {
+      display: flex;
+      gap: 12px;
+      font-size: 10px;
+    }
+    
+    .event-time {
+      opacity: 0.4;
+      min-width: 55px;
+      letter-spacing: 0.08em;
+    }
+    
+    .event-text {
+      opacity: 0.75;
+    }
+    
+    .outlook-text {
+      font-size: 11px;
+      line-height: 1.6;
+      opacity: 0.75;
+      border-left: 2px solid var(--accent);
+      padding-left: 12px;
+    }
+    
+    /* Articles Section */
+    .articles-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .article-card {
+      display: block;
+      padding: 12px;
+      border: 1px solid var(--border);
+      background: rgba(0,255,180,0.02);
+      text-decoration: none;
+      color: inherit;
+      transition: all 0.2s;
+    }
+    
+    .article-card:hover {
+      border-color: var(--accent);
+      background: rgba(0,255,180,0.06);
+    }
+    
+    .article-title {
+      font-size: 11px;
+      line-height: 1.4;
+      margin-bottom: 6px;
+      color: var(--text);
+      transition: color 0.2s;
+    }
+    
+    .article-card:hover .article-title {
+      color: var(--accent);
+    }
+    
+    .article-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 9px;
+      opacity: 0.5;
+      letter-spacing: 0.08em;
+    }
+    
+    .article-source {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .source-dot {
+      width: 4px;
+      height: 4px;
+      background: var(--accent);
+      border-radius: 50%;
+    }
+    
+    /* Ticker */
+    .ticker {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 32px;
+      background: var(--bg-panel);
+      border-top: 1px solid var(--border);
+      overflow: hidden;
+      z-index: 100;
+    }
+    
+    .ticker-content {
+      display: flex;
+      align-items: center;
+      height: 100%;
+      white-space: nowrap;
+      animation: ticker 60s linear infinite;
+    }
+    
+    @keyframes ticker {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    
+    .ticker-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 30px;
+      font-size: 10px;
+      letter-spacing: 0.05em;
+    }
+    
+    .ticker-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+    }
+
+    /* Historical timeline */
+    .timeline {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 32px;
+      height: 54px;
+      background: var(--bg-panel);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 16px;
+      z-index: 110;
+    }
+
+    .timeline-button {
+      width: 64px;
+      height: 30px;
+      border: 1px solid var(--border);
+      background: rgba(0,255,180,0.04);
+      color: var(--text);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      cursor: pointer;
+    }
+
+    .timeline-button:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .timeline-track {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .timeline-date {
+      min-width: 80px;
+      font-size: 10px;
+      opacity: 0.75;
+      letter-spacing: 0.1em;
+      text-align: center;
+    }
+
+    .timeline-slider {
+      flex: 1;
+      accent-color: #00ffb4;
+    }
+
+    .timeline-now {
+      min-width: 120px;
+      text-align: right;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+    }
+
+    /* Scanlines */
+    .scanlines {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.03) 2px,
+        rgba(0,0,0,0.03) 4px
+      );
+      z-index: 9999;
+    }
+    
+    /* Corners */
+    .corner {
+      position: fixed;
+      width: 40px;
+      height: 40px;
+      border: 1px solid var(--accent-dim);
+      pointer-events: none;
+      z-index: 100;
+    }
+    
+    .corner-tl { top: 10px; left: 10px; border-right: none; border-bottom: none; }
+    .corner-tr { top: 10px; right: 10px; border-left: none; border-bottom: none; }
+    .corner-bl { bottom: 96px; left: 10px; border-right: none; border-top: none; }
+    .corner-br { bottom: 96px; right: 10px; border-left: none; border-top: none; }
+
+    .brand-logo {
+      position: absolute;
+      top: 18px;
+      left: 22px;
+      z-index: 12;
+      padding: 6px 10px;
+      border: 1px solid var(--accent-dim);
+      background: rgba(2,9,7,0.9);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      color: var(--accent);
+      text-transform: uppercase;
+      text-shadow: 0 0 10px rgba(0,255,180,0.45);
+      pointer-events: auto;
+      cursor: pointer;
+      transition: border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .brand-logo:hover {
+      border-color: var(--accent);
+      color: #e6fff8;
+      box-shadow: 0 0 18px rgba(0,255,180,0.22);
+    }
+
+    .about-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2100;
+      padding: 20px;
+    }
+
+    .about-overlay.visible {
+      display: flex;
+    }
+
+    .about-card {
+      width: min(760px, 100%);
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      padding: 18px;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+
+    .about-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .about-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 16px;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+
+    .about-close {
+      width: 30px;
+      height: 30px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .about-close:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .about-text {
+      font-size: 12px;
+      line-height: 1.65;
+      opacity: 0.9;
+      margin-bottom: 10px;
+    }
+
+    .about-list {
+      padding-left: 18px;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+  </style>
+</head>
+<body>
+  <!-- Background Effects -->
+  <div class="bg-effect">
+    <div class="bg-grid"></div>
+    <div class="bg-radar"></div>
+    <div class="bg-orbs">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+    </div>
+    <div class="bg-particles">
+      <div class="particle" style="left: 10%; animation-delay: 0s;"></div>
+      <div class="particle" style="left: 20%; animation-delay: 2s;"></div>
+      <div class="particle" style="left: 30%; animation-delay: 4s;"></div>
+      <div class="particle" style="left: 40%; animation-delay: 1s;"></div>
+      <div class="particle" style="left: 50%; animation-delay: 3s;"></div>
+      <div class="particle" style="left: 60%; animation-delay: 5s;"></div>
+      <div class="particle" style="left: 70%; animation-delay: 2.5s;"></div>
+      <div class="particle" style="left: 80%; animation-delay: 4.5s;"></div>
+      <div class="particle" style="left: 90%; animation-delay: 1.5s;"></div>
+    </div>
+    <div class="bg-circuits">
+      <div class="circuit-line"></div>
+      <div class="circuit-line"></div>
+      <div class="circuit-line"></div>
+      <div class="circuit-line"></div>
+      <div class="circuit-v-line"></div>
+      <div class="circuit-v-line"></div>
+      <div class="circuit-v-line"></div>
+      <div class="circuit-v-line"></div>
+    </div>
+    <div class="bg-data-stream">01001010 SIGNAL INTERCEPT 11010011 THREAT ANALYSIS 00110101 MONITORING ACTIVE 10101010 SECURE CHANNEL</div>
+    <div class="bg-data-stream">UPLINK ESTABLISHED :: NODE 7A3F :: ENCRYPTION AES-256 :: PACKET RELAY ACTIVE :: STANDBY</div>
+    <div class="bg-data-stream">GEOSYNC ORBIT CONFIRMED :: SAT-INTEL-09 :: LAT 35.2N LON 42.8E :: THERMAL SIGNATURE DETECTED</div>
+    <div class="bg-data-stream">PRIORITY ALPHA :: SIGINT COLLECTION :: FREQ 14.225 MHZ :: DECRYPTION IN PROGRESS</div>
+    <div class="bg-data-stream">NETWORK STATUS NOMINAL :: NODES ONLINE: 847 :: BANDWIDTH ALLOCATION: 94% :: LATENCY: 23MS</div>
+    <div class="bg-vignette"></div>
+  </div>
+  
+  <div class="scanlines"></div>
+  <div class="corner corner-tl"></div>
+  <div class="corner corner-tr"></div>
+  <div class="corner corner-bl"></div>
+  <div class="corner corner-br"></div>
+  
+  <div class="container">
+    <div class="left-panel" id="left-panel">
+      <div class="panel-header">
+        <button class="panel-toggle" id="panel-toggle" aria-label="Toggle side panel">&lsaquo;</button>
+        <div class="panel-title">CONFLICT INDEX</div>
+        <div class="status-bar">
+          <div class="live-indicator">
+            <div class="live-dot"></div>
+            <span id="feed-mode">LIVE</span>
+          </div>
+          <span id="zone-count">12 ZONES</span>
+          <span id="utc-clock">00:00:00 UTC</span>
+        </div>
+      </div>
+      <div class="watchlist">
+        <div class="watch-tier immediate">
+          <div class="watch-tier-title">WATCHLIST :: IMMEDIATE</div>
+          <div class="watch-tier-items" id="watch-immediate"></div>
+        </div>
+        <div class="watch-tier near">
+          <div class="watch-tier-title">WATCHLIST :: NEAR-TERM</div>
+          <div class="watch-tier-items" id="watch-near"></div>
+        </div>
+        <div class="watch-tier monitor">
+          <div class="watch-tier-title">WATCHLIST :: MONITOR</div>
+          <div class="watch-tier-items" id="watch-monitor"></div>
+        </div>
+      </div>
+      <div class="conflict-list" id="conflict-list"></div>
+    </div>
+    
+    <div class="globe-area">
+      <button class="brand-logo" id="about-open" type="button">ThreatWatch</button>
+      <div class="console-frame"></div>
+      <div class="console-screen">
+        <div class="console-bezel"></div>
+        <div class="console-reflection"></div>
+        <div class="screen-noise"></div>
+      </div>
+      <div class="console-leds">
+        <div class="console-led green"></div>
+        <div class="console-led amber"></div>
+        <div class="console-led red"></div>
+      </div>
+      <div class="console-vents">
+        <div class="console-vent"></div>
+        <div class="console-vent"></div>
+        <div class="console-vent"></div>
+        <div class="console-vent"></div>
+        <div class="console-vent"></div>
+      </div>
+      <div class="console-label">THREATWATCH MK-IV</div>
+      <canvas id="globe-canvas"></canvas>
+      <div class="crt-scanlines"></div>
+    </div>
+  </div>
+  
+  <div class="tooltip" id="tooltip">
+    <div class="tooltip-title" id="tooltip-title"></div>
+    <div class="tooltip-status" id="tooltip-status"></div>
+    <div class="tooltip-hint">CLICK FOR INTEL</div>
+  </div>
+  
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" id="modal-title"></div>
+          <div class="modal-subtitle" id="modal-subtitle"></div>
+        </div>
+        <button class="modal-close" id="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
+
+  <div class="about-overlay" id="about-overlay">
+    <div class="about-card">
+      <div class="about-header">
+        <div class="about-title">About ThreatWatch</div>
+        <button class="about-close" id="about-close" type="button">&times;</button>
+      </div>
+      <p class="about-text">
+        ThreatWatch is an interactive geopolitical monitoring interface designed for rapid threat awareness.
+        It combines a rotating globe view, timeline playback, watchlist priorities, and region-level intelligence cards.
+      </p>
+      <ul class="about-list">
+        <li>Timeline-driven threat snapshots</li>
+        <li>Priority watchlists: Immediate, Near-term, Monitor</li>
+        <li>Interactive threat markers with focused zoom and intelligence drawer</li>
+        <li>Live tactical-style display optimized for quick visual scanning</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="timeline">
+    <button class="timeline-button" id="timeline-play">PLAY</button>
+    <div class="timeline-track">
+      <div class="timeline-date" id="timeline-start">APR 2025</div>
+      <input class="timeline-slider" id="timeline-slider" type="range" min="0" max="11" step="1" value="11">
+      <div class="timeline-date" id="timeline-end">MAR 2026</div>
+    </div>
+    <div class="timeline-now" id="timeline-now">CURRENT DATE: MAR 2026</div>
+  </div>
+  
+  <div class="ticker">
+    <div class="ticker-content" id="ticker-content"></div>
+  </div>
+
+  <script>
+    // Threat zones data with verified working article links
+    const baseThreatZones = [
+      { 
+        id: 1, name: "UKRAINE THEATER", country: "Ukraine", lat: 48.3794, lon: 31.1656, level: "critical", category: "Active Conflict", status: "CRITICAL — Active combat operations",
+        articles: [
+          { title: "Russia-Ukraine War: Live Updates", source: "Reuters", url: "https://www.reuters.com/world/ukraine-russia-war", time: "Live" },
+          { title: "Zelenskyy visits front line amid POW exchange", source: "Al Jazeera", url: "https://www.aljazeera.com/news/2026/3/6/zelenskyy-visits-front-line-as-ukraine-and-russia-swap-500-prisoners-each", time: "Mar 6" },
+          { title: "Russia-Ukraine war coverage", source: "AP News", url: "https://apnews.com/hub/russia-ukraine", time: "Ongoing" },
+          { title: "Ukraine war: Latest developments", source: "BBC News", url: "https://www.bbc.com/news/world-60525350", time: "Updated" }
+        ]
+      },
+      { 
+        id: 2, name: "GAZA STRIP", country: "Palestine", lat: 31.3547, lon: 34.3088, level: "critical", category: "Active Conflict", status: "CRITICAL — Humanitarian emergency",
+        articles: [
+          { title: "Israel-Iran conflict: Live updates", source: "BBC News", url: "https://www.bbc.com/news/live/ceqvwrydzpqt", time: "Live" },
+          { title: "Gaza fuel running short as Israel closes borders", source: "Reuters", url: "https://www.reuters.com/world/middle-east/gaza-fuel-running-short-after-israel-closes-borders-amid-iran-war-2026-03-02", time: "Mar 2" },
+          { title: "Israel-Hamas war news", source: "AP News", url: "https://apnews.com/hub/israel-hamas-war", time: "Ongoing" },
+          { title: "Palestine conflict coverage", source: "Al Jazeera", url: "https://www.aljazeera.com/where/palestine/", time: "Latest" }
+        ]
+      },
+      { 
+        id: 3, name: "TAIWAN STRAIT", country: "Taiwan", lat: 24.0, lon: 120.5, level: "high", category: "Geopolitical Tension", status: "HIGH — Military posturing observed",
+        articles: [
+          { title: "Chinese military flights around Taiwan fall", source: "Reuters", url: "https://www.reuters.com/business/aerospace-defense/chinese-military-flights-around-taiwan-fall-trump-xi-meeting-may-be-factor-2026-03-05", time: "Mar 5" },
+          { title: "China masking drone flights in Taiwan rehearsal", source: "Reuters", url: "https://www.reuters.com/world/china/how-china-is-masking-drone-flights-potential-taiwan-rehearsal-2026-02-26", time: "Feb 26" },
+          { title: "Taiwan says China war games sought to undermine support", source: "Reuters", url: "https://www.reuters.com/world/china/taiwan-says-chinas-war-games-sought-undermine-global-support-island-2026-01-07", time: "Jan 7" },
+          { title: "China bans two Taiwan ministers", source: "Reuters", url: "https://www.reuters.com/world/china/china-bans-two-taiwan-ministers-for-alleged-independence-activities-2026-01-07", time: "Jan 7" }
+        ]
+      },
+      { 
+        id: 4, name: "KOREAN DMZ", country: "Korea", lat: 38.0, lon: 127.0, level: "elevated", category: "Military Standoff", status: "ELEVATED — Increased activity",
+        articles: [
+          { title: "Kim Jong Un promises more nuclear weapons", source: "Reuters", url: "https://www.reuters.com/world/asia-pacific/north-koreas-kim-says-relations-with-us-depend-us-attitude-2026-02-25", time: "Feb 25" },
+          { title: "North Korea test fires hypersonic missiles", source: "Reuters", url: "https://www.reuters.com/world/asia-pacific/north-korea-test-fires-hypersonic-missiles-kcna-says-2026-01-04", time: "Jan 4" },
+          { title: "North Korea fires ballistic missile", source: "Reuters", url: "https://www.reuters.com/world/asia-pacific/north-korea-fires-ballistic-missile-towards-sea-off-its-east-coast-2026-01-03", time: "Jan 3" },
+          { title: "DPRK analysis and monitoring", source: "38 North", url: "https://www.38north.org/", time: "Analysis" }
+        ]
+      },
+      { 
+        id: 5, name: "SOUTH CHINA SEA", country: "International", lat: 12.0, lon: 114.0, level: "high", category: "Maritime Dispute", status: "HIGH — Naval confrontations",
+        articles: [
+          { title: "China conducts patrol, accuses Philippines", source: "Reuters", url: "https://www.reuters.com/world/china/china-conducts-patrol-south-china-sea-accuses-philippines-disrupting-peace-2026-02-27", time: "Feb 27" },
+          { title: "'Welcome to CHINA' greets Philippine officials", source: "Reuters", url: "https://www.reuters.com/world/china/welcome-china-greets-philippine-officials-trip-disputed-south-china-sea-2026-02-23", time: "Feb 23" },
+          { title: "South China Sea coverage", source: "AP News", url: "https://apnews.com/hub/south-china-sea", time: "Updated" },
+          { title: "Asia-Pacific security analysis", source: "The Diplomat", url: "https://thediplomat.com/", time: "Analysis" }
+        ]
+      },
+      { 
+        id: 6, name: "SUDAN CONFLICT", country: "Sudan", lat: 15.5007, lon: 32.5599, level: "critical", category: "Civil War", status: "CRITICAL — Active hostilities",
+        articles: [
+          { title: "Sudanese army retakes Bara, secures el-Obeid", source: "Al Jazeera", url: "https://www.aljazeera.com/news/2026/3/6/sudanese-army-retakes-bara-secures-el-obeid-in-north-kordofan", time: "Mar 6" },
+          { title: "Drone attacks in Kordofan cause mass casualties", source: "BBC News", url: "https://www.bbc.com/news/articles/cjwz6z14w65o", time: "Recent" },
+          { title: "UN: RSF atrocities point to genocide", source: "BBC News", url: "https://www.bbc.com/news/articles/cpqw74d81jqo", time: "Feb 19" },
+          { title: "Sudan crisis coverage", source: "AP News", url: "https://apnews.com/hub/sudan", time: "Ongoing" }
+        ]
+      },
+      { 
+        id: 7, name: "SAHEL REGION", country: "Mali/Niger", lat: 17.0, lon: 4.0, level: "high", category: "Insurgency", status: "HIGH — Terror activity",
+        articles: [
+          { title: "Islamist attacks in border zone up 90%", source: "Reuters", url: "https://www.reuters.com/world/africa/islamist-militant-attacks-niger-benin-nigeria-border-zone-soaring-research-shows-2026-02-26/", time: "Feb 26" },
+          { title: "Niger revokes licenses amid jihadist blockades", source: "BBC News", url: "https://www.bbc.com/news/articles/cr578g7v082o", time: "Recent" },
+          { title: "US shifts policy to engage Mali, Niger, Burkina", source: "BBC News", url: "https://www.bbc.com/news/articles/ckglwnrx437o", time: "Recent" },
+          { title: "Jihadist groups using drone strikes", source: "BBC News", url: "https://www.bbc.com/news/articles/cew8vldpzdyo", time: "Analysis" }
+        ]
+      },
+      { 
+        id: 8, name: "MYANMAR CRISIS", country: "Myanmar", lat: 19.7633, lon: 96.0785, level: "high", category: "Civil Conflict", status: "HIGH — Military operations",
+        articles: [
+          { title: "UNICEF alarmed over deadly Myanmar air strikes", source: "Reuters", url: "https://www.reuters.com/world/asia-pacific/unicef-alarmed-over-reports-deadly-myanmar-air-strikes-civilians-2026-02-26", time: "Feb 26" },
+          { title: "Sanctions call on Arakan Army amid Rohingya crisis", source: "Borderlens", url: "https://www.borderlens.com/2026/02/27/sanctions-call-on-arakan-army-amid-fresh-diplomatic-moves-over-rohingya-crisis/", time: "Feb 27" },
+          { title: "Myanmar resistance coverage", source: "AP News", url: "https://apnews.com/hub/myanmar", time: "Ongoing" },
+          { title: "Myanmar news and analysis", source: "Al Jazeera", url: "https://www.aljazeera.com/where/myanmar/", time: "Latest" }
+        ]
+      },
+      { 
+        id: 9, name: "HAITI UNREST", country: "Haiti", lat: 18.9712, lon: -72.2852, level: "elevated", category: "Civil Unrest", status: "ELEVATED — Gang violence",
+        articles: [
+          { title: "US extends Haiti flight restrictions until September", source: "Reuters", url: "https://www.reuters.com/business/aerospace-defense/us-extends-flight-restrictions-haiti-capital-until-early-september-2026-03-04", time: "Mar 4" },
+          { title: "UN approves Gang Suppression Force for Haiti", source: "BBC News", url: "https://www.bbc.com/news/articles/cn5qpkv0zq1o", time: "Oct 2025" },
+          { title: "Haiti security situation", source: "AP News", url: "https://apnews.com/hub/haiti", time: "Latest" },
+          { title: "Haiti news coverage", source: "Al Jazeera", url: "https://www.aljazeera.com/where/haiti/", time: "Ongoing" }
+        ]
+      },
+      { 
+        id: 10, name: "YEMEN WAR", country: "Yemen", lat: 15.5527, lon: 48.5164, level: "critical", category: "Active Conflict", status: "CRITICAL — Ongoing strikes",
+        articles: [
+          { title: "Houthis to resume Red Sea shipping attacks", source: "AP News", url: "https://apnews.com/hub/houthis", time: "Feb 28" },
+          { title: "Red Sea crisis as Houthi threats resurface", source: "gCaptain", url: "https://gcaptain.com/red-sea-corridor-slips-back-into-crisis-as-houthi-threats-resurface", time: "Recent" },
+          { title: "Houthi rebels driving aid groups to brink", source: "BBC News", url: "https://www.bbc.com/news/articles/cj4z129dq8vo", time: "Recent" },
+          { title: "Saudi Aramco seeks to reroute oil away from Hormuz", source: "Reuters", url: "https://www.reuters.com/business/energy/saudi-aramco-seeks-reroute-crude-away-strait-hormuz-sources-say-2026-03-03", time: "Mar 3" }
+        ]
+      },
+      { 
+        id: 11, name: "ETHIOPIA TIGRAY", country: "Ethiopia", lat: 14.0, lon: 38.5, level: "monitored", category: "Post-Conflict", status: "MONITORED — Ceasefire holding",
+        articles: [
+          { title: "Fears of return to war in Tigray growing", source: "BBC News", url: "https://www.bbc.com/news/articles/cwygrnjz9wro", time: "Feb 26" },
+          { title: "Ethiopia accuses Eritrea of arming rebels", source: "Reuters", url: "https://www.reuters.com/world/africa/ethiopia-accuses-eritrea-arming-rebels-escalating-war-words-2026-01-15", time: "Jan 15" },
+          { title: "Ethiopia news coverage", source: "AP News", url: "https://apnews.com/hub/ethiopia", time: "Updated" },
+          { title: "Ethiopia news and updates", source: "Al Jazeera", url: "https://www.aljazeera.com/where/ethiopia/", time: "Latest" }
+        ]
+      },
+      { 
+        id: 12, name: "KASHMIR REGION", country: "India/Pakistan", lat: 34.0837, lon: 74.7973, level: "elevated", category: "Border Tension", status: "ELEVATED — Periodic clashes",
+        articles: [
+          { title: "Pakistan-Afghanistan fighting enters fifth day", source: "Reuters", url: "https://www.reuters.com/world/asia-pacific/pakistan-afghanistan-show-no-signs-stepping-back-fighting-enters-fifth-day-2026-03-02", time: "Mar 2" },
+          { title: "Afghanistan fires at Pakistani jets over Kabul", source: "Reuters", url: "https://www.reuters.com/world/asia-pacific/afghanistan-fires-pakistani-jets-over-kabul-as-conflict-intensifies-2026-03-01", time: "Mar 1" },
+          { title: "India tells Pakistan to control drone intrusions", source: "Reuters", url: "https://www.reuters.com/world/india/india-has-told-pakistan-control-drone-intrusions-indian-army-chief-says-2026-01-13", time: "Jan 13" },
+          { title: "Pakistan President calls for Kashmir talks", source: "Financial Express", url: "https://www.financialexpress.com/world-news/india-is-preparing-for-another-war-pakistani-president-zardari-calls-for-kashmir-talks/4161077", time: "Mar 3" }
+        ]
+      }
+    ];
+
+    const levelColors = {
+      critical: '#ff3b5c',
+      high: '#ff9500',
+      elevated: '#ffd000',
+      monitored: '#00ff88',
+      stable: '#00d4aa'
+    };
+    const zoneFlagMeta = {
+      1: { label: 'Ukraine', flags: ['https://flagcdn.com/w1280/ua.png'] },
+      2: { label: 'Palestine', flags: ['https://flagcdn.com/w1280/ps.png'] },
+      3: { label: 'Taiwan', flags: ['https://flagcdn.com/w1280/tw.png'] },
+      4: { label: 'Korea', flags: ['https://flagcdn.com/w1280/kr.png', 'https://flagcdn.com/w1280/kp.png'] },
+      5: { label: 'International Waters', flags: ['https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Flag_of_the_United_Nations_%281947-1948%29.svg/1280px-Flag_of_the_United_Nations_%281947-1948%29.svg.png'] },
+      6: { label: 'Sudan', flags: ['https://flagcdn.com/w1280/sd.png'] },
+      7: { label: 'Mali / Niger', flags: ['https://flagcdn.com/w1280/ml.png', 'https://flagcdn.com/w1280/ne.png'] },
+      8: { label: 'Myanmar', flags: ['https://flagcdn.com/w1280/mm.png'] },
+      9: { label: 'Haiti', flags: ['https://flagcdn.com/w1280/ht.png'] },
+      10: { label: 'Yemen', flags: ['https://flagcdn.com/w1280/ye.png'] },
+      11: { label: 'Ethiopia', flags: ['https://flagcdn.com/w1280/et.png'] },
+      12: { label: 'India / Pakistan', flags: ['https://flagcdn.com/w1280/in.png', 'https://flagcdn.com/w1280/pk.png'] }
+    };
+    const levelOrder = ['stable', 'monitored', 'elevated', 'high', 'critical'];
+    const historyLabels = [
+      'APR 2025', 'MAY 2025', 'JUN 2025', 'JUL 2025', 'AUG 2025', 'SEP 2025',
+      'OCT 2025', 'NOV 2025', 'DEC 2025', 'JAN 2026', 'FEB 2026', 'MAR 2026'
+    ];
+
+    // Ticker messages
+    const tickerMessages = [
+      { text: "OSINT: Satellite imagery confirms troop movements in eastern sector", level: "high" },
+      { text: "ALERT: Naval assets repositioning in contested waters", level: "critical" },
+      { text: "UPDATE: Diplomatic channels remain open despite tensions", level: "monitored" },
+      { text: "INTEL: Cyber activity detected targeting infrastructure", level: "elevated" },
+      { text: "REPORT: Humanitarian corridors established in conflict zone", level: "monitored" },
+      { text: "FLASH: Airspace restrictions implemented over border region", level: "high" },
+      { text: "ANALYSIS: Economic sanctions impact assessment ongoing", level: "elevated" },
+      { text: "SIGINT: Communications intercepts indicate escalation risk", level: "critical" }
+    ];
+
+    // DOM elements
+    const canvas = document.getElementById('globe-canvas');
+    const ctx = canvas.getContext('2d');
+    const tooltip = document.getElementById('tooltip');
+    const modalOverlay = document.getElementById('modal-overlay');
+    const conflictList = document.getElementById('conflict-list');
+    const leftPanel = document.getElementById('left-panel');
+    const panelToggle = document.getElementById('panel-toggle');
+    const timelineSlider = document.getElementById('timeline-slider');
+    const timelinePlay = document.getElementById('timeline-play');
+    const timelineNow = document.getElementById('timeline-now');
+    const timelineStart = document.getElementById('timeline-start');
+    const timelineEnd = document.getElementById('timeline-end');
+    const feedMode = document.getElementById('feed-mode');
+    const watchImmediate = document.getElementById('watch-immediate');
+    const watchNear = document.getElementById('watch-near');
+    const watchMonitor = document.getElementById('watch-monitor');
+    const aboutOpen = document.getElementById('about-open');
+    const aboutOverlay = document.getElementById('about-overlay');
+    const aboutClose = document.getElementById('about-close');
+
+    // Globe state
+    let width, height, radius;
+    let rotation = { x: -20, y: 0 };
+    let targetRotation = { x: -20, y: 0 };
+    let velocity = { x: 0, y: 0.15 };
+    let isDragging = false;
+    let lastMouse = { x: 0, y: 0 };
+    let scale = 1;
+    let targetScale = 1;
+    let worldData = null;
+    let countryFeatures = [];
+    let hoveredZone = null;
+    
+    let selectedZone = null;
+    const threatHistory = buildThreatHistory(baseThreatZones);
+    let timelineIndex = threatHistory.length - 1;
+    let lastTimelineDragValue = timelineIndex;
+    let isTimelineDragging = false;
+    let playbackTimer = null;
+    let modalCloseTimer = null;
+    let isZoneLocked = false;
+    let lockedZoneId = null;
+    let preLockScale = 1;
+    let lockVisualProgress = 0;
+    const markerState = new Map();
+    const watchAssignments = new Map([
+      [1, 'immediate'],  // Ukraine theater
+      [2, 'immediate'],  // Gaza
+      [6, 'immediate'],  // Sudan
+      [10, 'immediate'], // Yemen
+      [3, 'near'],
+      [5, 'near'],
+      [7, 'monitor']
+    ]);
+    const watchColors = { immediate: '#ff3b5c', near: '#ffd000', monitor: '#00ff88' };
+    function shiftLevel(level, delta) {
+      const start = Math.max(0, levelOrder.indexOf(level));
+      const next = Math.min(levelOrder.length - 1, Math.max(0, start + delta));
+      return levelOrder[next];
+    }
+
+    function buildThreatHistory(baseZones) {
+      return historyLabels.map((label, frameIndex) => {
+        const zones = baseZones.map((zone, zoneIndex) => {
+          const wave = Math.sin((frameIndex + zoneIndex * 0.9) * 0.65);
+          let delta = 0;
+          if (wave > 0.55) delta = 1;
+          if (wave < -0.55) delta = -1;
+          if ((frameIndex + zone.id) % 17 === 0) delta = Math.max(delta, 1);
+          const level = shiftLevel(zone.level, delta);
+          return {
+            ...zone,
+            level,
+            status: `${level.toUpperCase()} — Snapshot ${label}`
+          };
+        });
+        return { label, zones };
+      });
+    }
+
+    function getCurrentZones() {
+      return threatHistory[timelineIndex]?.zones || baseThreatZones;
+    }
+    // Initialize
+    function init() {
+      resize();
+      window.addEventListener('resize', resize);
+      
+      // Load world data and country names
+      Promise.all([
+        d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'),
+        d3.tsv('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.tsv').catch(() => [])
+      ]).then(([data, nameRows]) => {
+        worldData = data;
+        buildCountryData(nameRows);
+        animate();
+      });
+
+      // Setup interactions
+      setupInteractions();
+      setupTimeline();
+      setupPanelToggle();
+      setupAboutPanel();
+      renderConflictList();
+      syncWatchAssignmentsToCurrentSnapshot();
+      renderWatchlist();
+      renderTicker();
+      updateClock();
+      setInterval(updateClock, 1000);
+    }
+
+    function setupTimeline() {
+      timelineSlider.max = String(threatHistory.length - 1);
+      timelineSlider.value = String(timelineIndex);
+      lastTimelineDragValue = timelineIndex;
+      timelineStart.textContent = threatHistory[0].label;
+      timelineEnd.textContent = threatHistory[threatHistory.length - 1].label;
+      updateTimelineUI();
+
+      const beginTimelineDrag = () => {
+        isTimelineDragging = true;
+        velocity = { x: 0, y: 0 };
+        lastTimelineDragValue = parseInt(timelineSlider.value, 10);
+      };
+      const endTimelineDrag = () => {
+        isTimelineDragging = false;
+        velocity = { x: 0, y: 0 };
+      };
+      timelineSlider.addEventListener('pointerdown', beginTimelineDrag);
+      timelineSlider.addEventListener('mousedown', beginTimelineDrag);
+      timelineSlider.addEventListener('touchstart', beginTimelineDrag, { passive: true });
+      window.addEventListener('pointerup', endTimelineDrag);
+      window.addEventListener('mouseup', endTimelineDrag);
+      window.addEventListener('touchend', endTimelineDrag, { passive: true });
+
+      timelineSlider.addEventListener('input', () => {
+        const nextIndex = parseInt(timelineSlider.value, 10);
+        timelineIndex = nextIndex;
+        lastTimelineDragValue = nextIndex;
+        updateTimelineUI();
+        renderConflictList();
+        syncWatchAssignmentsToCurrentSnapshot();
+        renderWatchlist();
+      });
+
+      timelinePlay.addEventListener('click', () => {
+        if (playbackTimer) {
+          stopPlayback();
+        } else {
+          startPlayback();
+        }
+      });
+
+    }
+
+    function setupPanelToggle() {
+      panelToggle.addEventListener('click', () => {
+        leftPanel.classList.toggle('collapsed');
+        const collapsed = leftPanel.classList.contains('collapsed');
+        panelToggle.innerHTML = collapsed ? '&rsaquo;' : '&lsaquo;';
+      });
+    }
+
+    function setupAboutPanel() {
+      aboutOpen.addEventListener('click', () => {
+        aboutOverlay.classList.add('visible');
+      });
+      aboutClose.addEventListener('click', () => {
+        aboutOverlay.classList.remove('visible');
+      });
+      aboutOverlay.addEventListener('click', (e) => {
+        if (e.target === aboutOverlay) {
+          aboutOverlay.classList.remove('visible');
+        }
+      });
+    }
+
+    function startPlayback() {
+      timelinePlay.textContent = 'PAUSE';
+      playbackTimer = setInterval(() => {
+        timelineIndex = (timelineIndex + 1) % threatHistory.length;
+        timelineSlider.value = String(timelineIndex);
+        updateTimelineUI();
+        renderConflictList();
+        syncWatchAssignmentsToCurrentSnapshot();
+        renderWatchlist();
+      }, 1300);
+      updateTimelineUI();
+    }
+
+    function stopPlayback() {
+      clearInterval(playbackTimer);
+      playbackTimer = null;
+      timelinePlay.textContent = 'PLAY';
+      lastTimelineDragValue = timelineIndex;
+      updateTimelineUI();
+    }
+
+    function updateTimelineUI() {
+      const frameLabel = threatHistory[timelineIndex].label;
+      timelineNow.textContent = `CURRENT DATE: ${frameLabel}`;
+      feedMode.textContent = playbackTimer || timelineIndex < threatHistory.length - 1 ? 'PLAYBACK' : 'LIVE';
+    }
+
+    function resize() {
+      const area = document.querySelector('.globe-area');
+      width = area.clientWidth;
+      height = area.clientHeight;
+      canvas.width = width;
+      canvas.height = height;
+      radius = Math.min(width, height) * 0.38;
+    }
+
+    function buildCountryData(nameRows) {
+      const nameById = new Map();
+      for (const row of nameRows) {
+        if (row.id && row.name) {
+          nameById.set(String(row.id), row.name);
+        }
+      }
+
+      const geo = topojson.feature(worldData, worldData.objects.countries);
+      countryFeatures = geo.features.map(feature => {
+        const name = nameById.get(String(feature.id)) || `Country ${feature.id}`;
+        return {
+          ...feature,
+          properties: {
+            ...(feature.properties || {}),
+            name
+          }
+        };
+      });
+
+    }
+
+    function setupInteractions() {
+      canvas.addEventListener('mousedown', e => {
+        isDragging = true;
+        lastMouse = { x: e.clientX, y: e.clientY };
+        velocity = { x: 0, y: 0 };
+      });
+
+      window.addEventListener('mouseup', () => {
+        isDragging = false;
+      });
+
+      canvas.addEventListener('mousemove', e => {
+        if (isDragging) {
+          const dx = e.clientX - lastMouse.x;
+          const dy = e.clientY - lastMouse.y;
+          rotation.y -= dx * 0.3;
+          rotation.x = Math.max(-90, Math.min(90, rotation.x + dy * 0.3));
+          targetRotation.y = rotation.y;
+          targetRotation.x = rotation.x;
+          velocity = { x: dy * 0.1, y: -dx * 0.1 };
+          lastMouse = { x: e.clientX, y: e.clientY };
+        }
+        checkHover(e);
+      });
+
+      canvas.addEventListener('wheel', e => {
+        e.preventDefault();
+        targetScale = Math.max(0.5, Math.min(3, targetScale - e.deltaY * 0.001));
+      });
+
+      canvas.addEventListener('click', e => {
+        if (hoveredZone) {
+          lockOnZone(hoveredZone);
+          openModal(hoveredZone);
+        } else if (isZoneLocked) {
+          closeModal();
+        }
+      });
+
+      document.getElementById('modal-close').addEventListener('click', closeModal);
+      modalOverlay.addEventListener('click', e => {
+        if (e.target === modalOverlay) closeModal();
+      });
+    }
+
+    function project(lon, lat) {
+      const lambda = lon * Math.PI / 180;
+      const phi = lat * Math.PI / 180;
+      const rotY = rotation.y * Math.PI / 180;
+      const rotX = rotation.x * Math.PI / 180;
+      const centerX = width / 2 + getViewportOffsetX();
+      const centerY = height / 2;
+
+      let x = Math.cos(phi) * Math.sin(lambda - rotY);
+      let y = Math.sin(phi);
+      let z = Math.cos(phi) * Math.cos(lambda - rotY);
+
+      const y2 = y * Math.cos(rotX) - z * Math.sin(rotX);
+      const z2 = y * Math.sin(rotX) + z * Math.cos(rotX);
+
+      if (z2 < -0.1) return null;
+
+      return {
+        x: centerX + x * radius * scale,
+        y: centerY - y2 * radius * scale,
+        z: z2
+      };
+    }
+
+    function getViewportOffsetX() {
+      // Shift globe left so locked marker remains visible next to right-side popup.
+      return -Math.min(width * 0.18, 190) * lockVisualProgress;
+    }
+
+    function checkHover(e) {
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      hoveredZone = null;
+      for (const zone of getCurrentZones()) {
+        const p = project(zone.lon, zone.lat);
+        if (p && p.z > 0) {
+          const dist = Math.hypot(mx - p.x, my - p.y);
+          const markerSize = (zone.level === 'critical' ? 18 : zone.level === 'high' ? 14 : 10) * scale;
+          if (dist < markerSize) {
+            hoveredZone = zone;
+            break;
+          }
+        }
+      }
+
+      if (hoveredZone) {
+        tooltip.classList.add('visible');
+        tooltip.style.left = (e.clientX + 15) + 'px';
+        tooltip.style.top = (e.clientY + 15) + 'px';
+        document.getElementById('tooltip-title').textContent = hoveredZone.name;
+        document.getElementById('tooltip-status').textContent = hoveredZone.status;
+        tooltip.style.borderColor = levelColors[hoveredZone.level];
+      } else {
+        tooltip.classList.remove('visible');
+      }
+    }
+
+    function animate() {
+      scale += (targetScale - scale) * 0.14;
+      lockVisualProgress += ((isZoneLocked ? 1 : 0) - lockVisualProgress) * 0.14;
+
+      if (isZoneLocked) {
+        const dy = shortestAngleDiff(rotation.y, targetRotation.y);
+        rotation.y += dy * 0.14;
+        rotation.x += (targetRotation.x - rotation.x) * 0.14;
+      } else if (!isDragging) {
+        rotation.y += velocity.y;
+        rotation.x += velocity.x;
+        velocity.x *= 0.98;
+        velocity.y *= 0.995;
+        if (Math.abs(velocity.y) < 0.01) velocity.y = 0;
+        targetRotation.y = rotation.y;
+        targetRotation.x = rotation.x;
+      }
+
+      draw();
+      requestAnimationFrame(animate);
+    }
+
+    function draw() {
+      const centerX = width / 2 + getViewportOffsetX();
+      const centerY = height / 2;
+      ctx.fillStyle = '#020907';
+      ctx.fillRect(0, 0, width, height);
+
+      // Draw globe outline
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius * scale, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(0,255,180,0.15)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Draw atmosphere glow
+      const gradient = ctx.createRadialGradient(
+        centerX, centerY, radius * scale * 0.8,
+        centerX, centerY, radius * scale * 1.2
+      );
+      gradient.addColorStop(0, 'transparent');
+      gradient.addColorStop(0.5, 'rgba(0,255,180,0.03)');
+      gradient.addColorStop(1, 'transparent');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+
+      // Draw countries
+      if (countryFeatures.length) {
+        ctx.strokeStyle = 'rgba(0,255,180,0.65)';
+        ctx.fillStyle = 'rgba(0,255,180,0.04)';
+        ctx.lineWidth = 0.5;
+
+        for (const country of countryFeatures) {
+          drawFeature(country);
+        }
+      }
+
+      // Draw graticule
+      ctx.strokeStyle = 'rgba(0,255,180,0.08)';
+      ctx.lineWidth = 0.5;
+      for (let lat = -80; lat <= 80; lat += 20) {
+        ctx.beginPath();
+        let started = false;
+        for (let lon = -180; lon <= 180; lon += 5) {
+          const p = project(lon, lat);
+          if (p && p.z > 0) {
+            if (!started) {
+              ctx.moveTo(p.x, p.y);
+              started = true;
+            } else {
+              ctx.lineTo(p.x, p.y);
+            }
+          } else {
+            started = false;
+          }
+        }
+        ctx.stroke();
+      }
+
+      for (let lon = -180; lon < 180; lon += 30) {
+        ctx.beginPath();
+        let started = false;
+        for (let lat = -90; lat <= 90; lat += 5) {
+          const p = project(lon, lat);
+          if (p && p.z > 0) {
+            if (!started) {
+              ctx.moveTo(p.x, p.y);
+              started = true;
+            } else {
+              ctx.lineTo(p.x, p.y);
+            }
+          } else {
+            started = false;
+          }
+        }
+        ctx.stroke();
+      }
+
+      // Draw threat markers
+      const now = Date.now();
+      for (const zone of getCurrentZones()) {
+        const projected = project(zone.lon, zone.lat);
+        const visible = Boolean(projected && projected.z > 0);
+        const state = markerState.get(zone.id) || { alpha: 0, x: width / 2, y: height / 2 };
+        if (visible) {
+          state.x = projected.x;
+          state.y = projected.y;
+        }
+        const targetAlpha = visible ? 1 : 0;
+        state.alpha += (targetAlpha - state.alpha) * 0.18;
+        markerState.set(zone.id, state);
+        if (state.alpha < 0.03 && !visible) continue;
+
+        const color = levelColors[zone.level];
+        const appearScale = 0.72 + state.alpha * 0.48;
+        const baseSize = (zone.level === 'critical' ? 15 : zone.level === 'high' ? 11 : 8) * scale * appearScale;
+
+        ctx.save();
+        ctx.globalAlpha = Math.max(0.08, Math.min(1, state.alpha));
+
+        // Soft glow under core
+        const glow = ctx.createRadialGradient(state.x, state.y, baseSize * 0.2, state.x, state.y, baseSize * 2);
+        glow.addColorStop(0, color.replace(')', ',0.32)').replace('rgb', 'rgba'));
+        glow.addColorStop(1, color.replace(')', ',0)').replace('rgb', 'rgba'));
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(state.x, state.y, baseSize * 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Core fill
+        ctx.beginPath();
+        ctx.arc(state.x, state.y, baseSize, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+
+        // Inner white ring border
+        ctx.beginPath();
+        ctx.arc(state.x, state.y, baseSize, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+        ctx.lineWidth = Math.max(2, baseSize * 0.2);
+        ctx.stroke();
+
+        // Inner disc
+        ctx.beginPath();
+        ctx.arc(state.x, state.y, baseSize * 0.45, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.fill();
+
+        // Tesla-coil style electrical arcs
+        const arcCount = 6;
+        const baseAngle = ((now * 0.002) + zone.id * 1.7) % (Math.PI * 2);
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 12;
+        ctx.strokeStyle = color.replace(')', ',0.9)').replace('rgb', 'rgba');
+        ctx.lineWidth = 1.6;
+
+        for (let a = 0; a < arcCount; a++) {
+          const theta = baseAngle + (a / arcCount) * Math.PI * 2;
+          const startR = baseSize * 1.1;
+          const endR = baseSize * 2.15;
+          const segments = 6;
+          ctx.beginPath();
+          for (let s = 0; s <= segments; s++) {
+            const t = s / segments;
+            const r = startR + (endR - startR) * t;
+            const wobble = Math.sin((s * 2.4) + zone.id * 0.8 + a) * (baseSize * 0.12);
+            const bend = Math.sin((t * 6.28) + a) * (baseSize * 0.08);
+            const x = state.x + Math.cos(theta + bend) * (r + wobble);
+            const y = state.y + Math.sin(theta + bend) * (r + wobble);
+            if (s === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+        }
+
+        // Bright ionized halo ring
+        ctx.beginPath();
+        ctx.arc(state.x, state.y, baseSize * 1.55, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+        ctx.lineWidth = 1.1;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // Highlight if hovered
+        if (hoveredZone === zone && visible) {
+          ctx.beginPath();
+          ctx.arc(state.x, state.y, baseSize * 2.4, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+          ctx.lineWidth = 2.4;
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
+
+    function drawFeature(feature) {
+      const coords = feature.geometry.type === 'Polygon' 
+        ? [feature.geometry.coordinates] 
+        : feature.geometry.coordinates;
+
+      for (const polygon of coords) {
+        for (const ring of polygon) {
+          ctx.beginPath();
+          let started = false;
+          for (const [lon, lat] of ring) {
+            const p = project(lon, lat);
+            if (p && p.z > 0) {
+              if (!started) {
+                ctx.moveTo(p.x, p.y);
+                started = true;
+              } else {
+                ctx.lineTo(p.x, p.y);
+              }
+            }
+          }
+          if (started) {
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
+    function renderConflictList() {
+      const zones = getCurrentZones();
+      document.getElementById('zone-count').textContent = `${zones.length} ZONES`;
+      conflictList.innerHTML = zones.map(zone => `
+        <div class="conflict-card" data-id="${zone.id}">
+          <div class="conflict-header">
+            <div class="conflict-name">${zone.name}</div>
+            <div class="danger-badge" style="color: ${levelColors[zone.level]}; border-color: ${levelColors[zone.level]}">
+              ${zone.level.toUpperCase()}
+            </div>
+          </div>
+          <div class="conflict-meta">${zone.country} — ${zone.category}</div>
+          <div class="watch-actions">
+            <button class="watch-btn" data-action="immediate" data-id="${zone.id}">IMMEDIATE</button>
+            <button class="watch-btn" data-action="near" data-id="${zone.id}">NEAR</button>
+            <button class="watch-btn" data-action="monitor" data-id="${zone.id}">MONITOR</button>
+            <button class="watch-btn" data-action="clear" data-id="${zone.id}">CLEAR</button>
+          </div>
+        </div>
+      `).join('');
+
+      conflictList.querySelectorAll('.conflict-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const zone = zones.find(z => z.id === parseInt(card.dataset.id, 10));
+          if (zone) {
+            lockOnZone(zone);
+            openModal(zone);
+          }
+        });
+      });
+
+      conflictList.querySelectorAll('.watch-btn').forEach(button => {
+        button.addEventListener('click', e => {
+          e.stopPropagation();
+          const zoneId = parseInt(button.dataset.id, 10);
+          const action = button.dataset.action;
+          if (!zoneId || !action) return;
+          if (action === 'clear') {
+            watchAssignments.delete(zoneId);
+          } else {
+            watchAssignments.set(zoneId, action);
+          }
+          renderWatchlist();
+        });
+      });
+    }
+
+    function renderWatchlist() {
+      const zonesById = new Map(getCurrentZones().map(zone => [zone.id, zone]));
+      const groups = { immediate: [], near: [], monitor: [] };
+
+      for (const [zoneId, tier] of watchAssignments.entries()) {
+        const zone = zonesById.get(zoneId) || baseThreatZones.find(z => z.id === zoneId);
+        if (zone && groups[tier]) groups[tier].push(zone);
+      }
+
+      renderWatchTier(watchImmediate, groups.immediate, 'IMMEDIATE');
+      renderWatchTier(watchNear, groups.near, 'NEAR-TERM');
+      renderWatchTier(watchMonitor, groups.monitor, 'MONITOR');
+    }
+
+    function renderWatchTier(container, zones, emptyText) {
+      if (!zones.length) {
+        container.innerHTML = `<span class="watch-empty">NO ${emptyText} ITEMS</span>`;
+        return;
+      }
+
+      container.innerHTML = zones.map(zone => {
+        const tier = watchAssignments.get(zone.id);
+        const color = watchColors[tier] || '#00ffb4';
+        return `<span class="watch-item" style="border-color:${color};color:${color}">${zone.name}</span>`;
+      }).join('');
+    }
+
+    function syncWatchAssignmentsToCurrentSnapshot() {
+      watchAssignments.clear();
+      for (const zone of getCurrentZones()) {
+        if (zone.level === 'critical') {
+          watchAssignments.set(zone.id, 'immediate');
+        } else if (zone.level === 'high' || zone.level === 'elevated') {
+          watchAssignments.set(zone.id, 'near');
+        } else {
+          watchAssignments.set(zone.id, 'monitor');
+        }
+      }
+    }
+
+    function focusOnZone(zone) {
+      velocity = { x: 0, y: 0 };
+      // Animate camera toward selected lat/lon.
+      targetRotation.y = zone.lon;
+      targetRotation.x = zone.lat;
+    }
+
+    function shortestAngleDiff(fromDeg, toDeg) {
+      return ((((toDeg - fromDeg) % 360) + 540) % 360) - 180;
+    }
+
+    function getZoneFlagMeta(zone) {
+      return zoneFlagMeta[zone.id] || {
+        label: zone.country,
+        flags: ['placeholder.jpg']
+      };
+    }
+
+    function isSeaZone(zone) {
+      const text = `${zone.name} ${zone.category}`.toLowerCase();
+      return text.includes('sea') || text.includes('maritime') || text.includes('ocean');
+    }
+
+    function getSeaImage(zone) {
+      const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="520" viewBox="0 0 900 520">
+  <defs>
+    <linearGradient id="seaBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a2c52"/>
+      <stop offset="100%" stop-color="#041a33"/>
+    </linearGradient>
+    <linearGradient id="wave" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#47b9ff" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#7be7ff" stop-opacity="0.35"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="520" fill="url(#seaBg)"/>
+  <path d="M0 285 C90 255 180 315 270 285 C360 255 450 315 540 285 C630 255 720 315 810 285 C855 270 880 275 900 285 L900 520 L0 520 Z" fill="url(#wave)"/>
+  <path d="M0 340 C95 312 175 370 270 340 C365 312 445 370 540 340 C635 312 715 370 810 340 C855 325 880 330 900 340" fill="none" stroke="#9fe8ff" stroke-opacity="0.45" stroke-width="4"/>
+  <path d="M0 390 C95 362 175 420 270 390 C365 362 445 420 540 390 C635 362 715 420 810 390 C855 375 880 380 900 390" fill="none" stroke="#b9f1ff" stroke-opacity="0.32" stroke-width="3"/>
+  <text x="450" y="120" fill="#77dcff" font-family="monospace" font-size="34" text-anchor="middle" letter-spacing="1.2">${zone.name}</text>
+  <text x="450" y="160" fill="#d8f6ff" font-family="monospace" font-size="18" text-anchor="middle">MARITIME AO IMAGE</text>
+</svg>`;
+      return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+    }
+
+    function lockOnZone(zone) {
+      if (!isZoneLocked) preLockScale = scale;
+      isZoneLocked = true;
+      lockedZoneId = zone.id;
+      focusOnZone(zone);
+      targetScale = Math.max(targetScale, 1.65);
+      velocity = { x: 0, y: 0 };
+    }
+
+    function unlockZoneLock() {
+      if (!isZoneLocked) return;
+      isZoneLocked = false;
+      lockedZoneId = null;
+      targetScale = preLockScale;
+      targetRotation.y = rotation.y;
+      targetRotation.x = rotation.x;
+      velocity = { x: 0, y: 0.15 };
+    }
+
+    function openModal(zone) {
+      if (modalCloseTimer) {
+        clearTimeout(modalCloseTimer);
+        modalCloseTimer = null;
+      }
+      modalOverlay.classList.remove('closing');
+      selectedZone = zone;
+      document.getElementById('modal-title').textContent = zone.name;
+      document.getElementById('modal-subtitle').textContent = `${zone.country} — ${zone.category} — ${threatHistory[timelineIndex].label}`;
+      
+      const articles = zone.articles || [];
+      const seaZone = isSeaZone(zone);
+      const flagMeta = getZoneFlagMeta(zone);
+      const multiFlagClass = flagMeta.flags.length > 1 ? 'multi' : '';
+      const flagsHtml = seaZone
+        ? `<img class="flag-photo" src="${getSeaImage(zone)}" alt="${zone.name} sea image" loading="lazy">`
+        : flagMeta.flags.map((src) =>
+            `<img class="flag-photo" src="${src}" alt="${flagMeta.label} flag" loading="lazy" onerror="this.onerror=null;this.src='placeholder.jpg';">`
+          ).join('');
+      const mediaCaption = seaZone
+        ? `${zone.name} :: MARITIME THEATER`
+        : `${flagMeta.label} :: FLAG IDENTIFICATION`;
+
+      document.getElementById('modal-body').innerHTML = `
+        <div class="intel-image-wrap">
+          <div class="flag-grid ${multiFlagClass}">
+            ${flagsHtml}
+          </div>
+          <div class="intel-image-caption">${mediaCaption}</div>
+        </div>
+
+        <div class="intel-section">
+          <div class="intel-label">SITUATION REPORT</div>
+          <div class="intel-text">Current status indicates ${zone.level} threat level with ongoing developments in the ${zone.name} region. Intelligence assets continue monitoring the situation with heightened attention to potential escalation vectors and humanitarian considerations.</div>
+        </div>
+        
+        <div class="intel-section">
+          <div class="intel-label">THREAT DRIVERS</div>
+          <div class="intel-drivers">
+            <div class="driver-tag">Military Operations</div>
+            <div class="driver-tag">Political Instability</div>
+            <div class="driver-tag">Humanitarian Crisis</div>
+            <div class="driver-tag">Regional Tensions</div>
+          </div>
+        </div>
+        
+        <div class="intel-section">
+          <div class="intel-label">RECENT ACTIVITY</div>
+          <div class="intel-events">
+            <div class="event-item">
+              <span class="event-time">-2H</span>
+              <span class="event-text">Satellite imagery confirms new activity in sector</span>
+            </div>
+            <div class="event-item">
+              <span class="event-time">-6H</span>
+              <span class="event-text">Communications intercept indicates tactical shift</span>
+            </div>
+            <div class="event-item">
+              <span class="event-time">-12H</span>
+              <span class="event-text">OSINT reports civilian displacement ongoing</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="intel-section">
+          <div class="intel-label">NEAR-TERM OUTLOOK</div>
+          <div class="outlook-text" style="border-color: ${levelColors[zone.level]}">
+            Near-term forecast indicates continued instability with potential for escalation. International monitoring ongoing with diplomatic channels remaining active.
+          </div>
+        </div>
+        
+        <div class="intel-section">
+          <div class="intel-label">RELATED ARTICLES</div>
+          <div class="articles-list">
+            ${articles.map(article => `
+              <a href="${article.url}" target="_blank" rel="noopener noreferrer" class="article-card">
+                <div class="article-title">${article.title}</div>
+                <div class="article-meta">
+                  <span class="article-source">
+                    <span class="source-dot"></span>
+                    ${article.source}
+                  </span>
+                  <span>${article.time}</span>
+                </div>
+              </a>
+            `).join('')}
+          </div>
+        </div>
+      `;
+
+      modalOverlay.classList.add('visible');
+    }
+
+    function closeModal() {
+      unlockZoneLock();
+      modalOverlay.classList.add('closing');
+      if (modalCloseTimer) clearTimeout(modalCloseTimer);
+      modalCloseTimer = setTimeout(() => {
+        modalOverlay.classList.remove('visible');
+        modalOverlay.classList.remove('closing');
+        selectedZone = null;
+        modalCloseTimer = null;
+      }, 170);
+    }
+
+    function renderTicker() {
+      const content = document.getElementById('ticker-content');
+      const items = [...tickerMessages, ...tickerMessages].map(msg => `
+        <span class="ticker-item">
+          <span class="ticker-dot" style="background: ${levelColors[msg.level]}"></span>
+          ${msg.text}
+        </span>
+      `).join('');
+      content.innerHTML = items;
+    }
+
+    function updateClock() {
+      const now = new Date();
+      const utc = now.toISOString().substr(11, 8);
+      document.getElementById('utc-clock').textContent = utc + ' UTC';
+    }
+
+    // Start
+    init();
+  </script>
+</body>
+</html>
